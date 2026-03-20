@@ -1,0 +1,65 @@
+---
+id: 0
+name: Testnet deployment
+network: testnet
+stacks-node: "https://api.testnet.hiro.so"
+bitcoin-node: "http://blockstack:blockstacksystem@bitcoind.testnet.stacks.co:18332"
+plan:
+  batches:
+    - id: 0
+      transactions:
+        - requirement-publish:
+            contract-id: SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait
+            remap-sender: ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E
+            remap-principals:
+              SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9: ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E
+            cost: 4680
+            path: ".\\.cache\\requirements\\SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait.clar"
+            clarity-version: 1
+        - requirement-publish:
+            contract-id: SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard
+            remap-sender: ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E
+            remap-principals:
+              SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE: ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E
+            cost: 8400
+            path: ".\\.cache\\requirements\\SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard.clar"
+            clarity-version: 1
+      epoch: "2.0"
+    - id: 1
+      transactions:
+        - contract-publish:
+            contract-name: character-nft
+            expected-sender: ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E
+            cost: 59060
+            path: "contracts\\character-nft.clar"
+            anchor-block-only: true
+            clarity-version: 2
+        - contract-publish:
+            contract-name: gold-token
+            expected-sender: ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E
+            cost: 37740
+            path: "contracts\\gold-token.clar"
+            anchor-block-only: true
+            clarity-version: 2
+        - contract-publish:
+            contract-name: items
+            expected-sender: ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E
+            cost: 82520
+            path: "contracts\\items.clar"
+            anchor-block-only: true
+            clarity-version: 2
+        - contract-publish:
+            contract-name: leaderboard
+            expected-sender: ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E
+            cost: 52580
+            path: "contracts\\leaderboard.clar"
+            anchor-block-only: true
+            clarity-version: 2
+        - contract-publish:
+            contract-name: wog-sprint
+            expected-sender: ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E
+            cost: 68070
+            path: "contracts\\wog-sprint.clar"
+            anchor-block-only: true
+            clarity-version: 2
+      epoch: "2.5"

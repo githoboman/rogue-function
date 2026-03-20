@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+shard/.env
+*.log
+.DS_Store
+game-state.json
+game-state.json.tmp
+pnpm-lock.yaml

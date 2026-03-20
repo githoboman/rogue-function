@@ -1,0 +1,72 @@
+version: "3.9"
+
+services:
+
+  shard:
+    build: { context: ./shard, dockerfile: Dockerfile }
+    container_name: wog-shard
+    expose: ["3000"]
+    environment:
+      - PORT=3000
+      - STACKS_NETWORK=${STACKS_NETWORK:-testnet}
+      - SERVER_PRIVATE_KEY=${SERVER_PRIVATE_KEY}
+      - SERVER_STACKS_ADDRESS=${SERVER_STACKS_ADDRESS}
+      - GOLD_CONTRACT_ADDRESS=${GOLD_CONTRACT_ADDRESS}
+      - CHARACTER_CONTRACT_ADDRESS=${CHARACTER_CONTRACT_ADDRESS}
+      - ITEMS_CONTRACT_ADDRESS=${ITEMS_CONTRACT_ADDRESS}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AGENT_COUNT=${AGENT_COUNT:-3}
+      - SAVE_FILE=/app/data/game-state.json
+    volumes:
+      - "./shard/agent-config.json:/app/agent-config.json"
+      - "game-data:/app/data"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  agents:
+    build: { context: ./shard, dockerfile: Dockerfile }
+    container_name: wog-agents
+    command: ["tsx", "src/batchAgents.ts"]
+    environment:
+      - SHARD_SERVER_URL=http://shard:3000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - SERVER_STACKS_ADDRESS=${SERVER_STACKS_ADDRESS}
+      - SERVER_PRIVATE_KEY=${SERVER_PRIVATE_KEY}
+      - GOLD_CONTRACT_ADDRESS=${GOLD_CONTRACT_ADDRESS}
+      - CHARACTER_CONTRACT_ADDRESS=${CHARACTER_CONTRACT_ADDRESS}
+      - ITEMS_CONTRACT_ADDRESS=${ITEMS_CONTRACT_ADDRESS}
+      - STACKS_NETWORK=${STACKS_NETWORK:-testnet}
+      - AGENT_COUNT=${AGENT_COUNT:-3}
+    depends_on:
+      shard: { condition: service_healthy }
+    volumes: ["./shard/agent-config.json:/app/agent-config.json"]
+    restart: unless-stopped
+
+  client:
+    build: { context: ./client, dockerfile: Dockerfile }
+    container_name: wog-client
+    expose: ["80"]
+    depends_on: [shard]
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: wog-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "./Caddyfile:/etc/caddy/Caddyfile"
+      - "caddy-data:/data"
+      - "caddy-config:/config"
+    depends_on: [client]
+    restart: unless-stopped
+
+volumes:
+  game-data:
+  caddy-data:
+  caddy-config:

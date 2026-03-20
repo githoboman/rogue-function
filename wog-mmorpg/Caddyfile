@@ -1,0 +1,8 @@
+# For local dev / no domain: use :80 (HTTP only)
+# For production: replace with your domain (e.g., wog.example.com)
+# Caddy auto-provisions HTTPS with Let's Encrypt when using a real domain.
+
+{$DOMAIN:localhost} {
+    # All traffic → nginx client container (which proxies API/WS to shard)
+    reverse_proxy client:80
+}

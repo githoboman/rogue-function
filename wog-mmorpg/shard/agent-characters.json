@@ -1,0 +1,23 @@
+{
+  "agent-0": {
+    "name": "Ragnar",
+    "classId": 0,
+    "race": 0,
+    "characterTokenId": 1,
+    "wallet": "ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E"
+  },
+  "agent-1": {
+    "name": "Lyria",
+    "classId": 1,
+    "race": 1,
+    "characterTokenId": 2,
+    "wallet": "ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E"
+  },
+  "agent-2": {
+    "name": "Kira",
+    "classId": 2,
+    "race": 1,
+    "characterTokenId": 3,
+    "wallet": "ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E"
+  }
+}
