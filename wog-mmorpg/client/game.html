@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>WoG MMORPG</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #06060c; color: #d8cfc0; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      overflow: hidden; display: flex; flex-direction: column; height: 100vh;
+    }
+
+    /* ── Topbar ─────────────────────────────────────────── */
+    #topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px; height: 52px; flex-shrink: 0;
+      background: linear-gradient(180deg, rgba(16,16,26,0.98) 0%, rgba(10,10,18,0.98) 100%);
+      border-bottom: 1px solid rgba(200,168,75,0.08);
+      backdrop-filter: blur(12px);
+    }
+    .topbar-left { display: flex; align-items: center; gap: 20px; }
+    #topbar h1 {
+      font-size: 14px; font-weight: 800; letter-spacing: 5px; text-transform: uppercase;
+      background: linear-gradient(135deg, #e8c860 0%, #c8a84b 50%, #a88a30 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .topbar-stats { display: flex; gap: 18px; font-size: 11px; color: #4a4a5a; font-weight: 500; }
+    .topbar-stats .stat-label { color: #3a3a4a; }
+    .topbar-stats .stat-val {
+      color: #8a8a9a; font-weight: 700; font-variant-numeric: tabular-nums;
+    }
+    .topbar-right { display: flex; align-items: center; gap: 14px; }
+    #tick-count { font-size: 10px; color: #2a2a3a; font-family: 'Courier New', monospace; font-variant-numeric: tabular-nums; }
+    #connection-status {
+      font-size: 10px; padding: 5px 14px; border-radius: 20px; font-weight: 600;
+      background: rgba(20,20,35,0.6); border: 1px solid rgba(255,255,255,0.04);
+      backdrop-filter: blur(8px); transition: all 0.4s ease;
+    }
+    #connection-status.connected {
+      color: #4caf50; border-color: rgba(76,175,80,0.2);
+      background: rgba(76,175,80,0.06);
+      box-shadow: 0 0 12px rgba(76,175,80,0.08);
+    }
+    #connection-status.disconnected {
+      color: #f44336; border-color: rgba(244,67,54,0.2);
+      background: rgba(244,67,54,0.06);
+    }
+
+    /* ── Main Layout ───────────────────────────────────── */
+    #main { display: flex; flex: 1; overflow: hidden; }
+    #game-container { flex: 1; position: relative; overflow: hidden; background: #1a2a18; }
+    #game-container canvas { display: block; }
+
+    /* ── Zone Tabs ──────────────────────────────────────── */
+    #zone-tabs { position: absolute; top: 12px; left: 12px; display: flex; gap: 6px; z-index: 10; }
+    .zone-tab {
+      padding: 7px 16px; background: rgba(8,8,16,0.85); border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 8px; font-size: 11px; cursor: pointer; color: #555568;
+      font-weight: 600; transition: all 0.25s ease; backdrop-filter: blur(12px);
+      letter-spacing: 0.3px;
+    }
+    .zone-tab:hover { color: #9999aa; border-color: rgba(255,255,255,0.1); background: rgba(20,20,35,0.9); transform: translateY(-1px); }
+    .zone-tab.active {
+      color: #e8c860; border-color: rgba(200,168,75,0.3);
+      background: linear-gradient(135deg, rgba(200,168,75,0.1) 0%, rgba(200,168,75,0.04) 100%);
+      box-shadow: 0 2px 12px rgba(200,168,75,0.1);
+    }
+
+    /* ── Right Panel ───────────────────────────────────── */
+    #right-panel {
+      width: 340px; flex-shrink: 0;
+      background: linear-gradient(180deg, #0b0b14 0%, #080810 100%);
+      border-left: 1px solid rgba(255,255,255,0.04);
+      display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden;
+    }
+    .panel-section { border-bottom: 1px solid rgba(255,255,255,0.03); flex-shrink: 0; }
+    .panel-title {
+      padding: 10px 18px; font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase;
+      color: #7a6a40; font-weight: 700;
+      background: linear-gradient(90deg, rgba(200,168,75,0.04) 0%, transparent 100%);
+      display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid rgba(200,168,75,0.04);
+      cursor: pointer; user-select: none;
+    }
+    .panel-title:hover { color: #9a8a50; }
+    .panel-title .badge {
+      background: linear-gradient(135deg, rgba(200,168,75,0.15) 0%, rgba(200,168,75,0.08) 100%);
+      color: #c8a84b; padding: 2px 10px;
+      border-radius: 12px; font-size: 9px; font-weight: 800;
+      border: 1px solid rgba(200,168,75,0.1);
+    }
+    .panel-title .toggle { font-size: 8px; color: #3a3a4a; transition: transform 0.2s; }
+    .panel-section.collapsed .panel-content { display: none; }
+    .panel-section.collapsed .toggle { transform: rotate(-90deg); }
+
+    /* ── Join Game Form ─────────────────────────────────── */
+    #join-section { padding: 12px 18px; }
+    #join-form { display: flex; flex-direction: column; gap: 12px; }
+    #join-form label {
+      font-size: 10px; color: #4a4a5a; text-transform: uppercase;
+      letter-spacing: 1.5px; font-weight: 700;
+    }
+    #join-form input, #join-form select {
+      background: rgba(16,16,26,0.8); border: 1px solid rgba(255,255,255,0.06);
+      color: #d8cfc0; padding: 10px 14px;
+      font-family: 'Inter', system-ui, sans-serif; font-size: 12px;
+      border-radius: 8px; outline: none; transition: all 0.25s ease;
+    }
+    #join-form input:focus, #join-form select:focus {
+      border-color: rgba(200,168,75,0.4);
+      box-shadow: 0 0 0 3px rgba(200,168,75,0.06), 0 0 16px rgba(200,168,75,0.05);
+      background: rgba(20,20,32,0.9);
+    }
+    #join-form input::placeholder { color: #2a2a38; }
+    #join-form select { cursor: pointer; }
+    #join-btn {
+      background: linear-gradient(135deg, #d4b452 0%, #c8a84b 50%, #b89838 100%);
+      color: #0a0a0f; border: none; padding: 11px 20px;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 12px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase;
+      cursor: pointer; border-radius: 8px; transition: all 0.25s ease; margin-top: 4px;
+      box-shadow: 0 2px 8px rgba(200,168,75,0.15);
+    }
+    #join-btn:hover {
+      background: linear-gradient(135deg, #e4c462 0%, #d4b452 50%, #c8a84b 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(200,168,75,0.25);
+    }
+    #join-btn:active { transform: translateY(0); box-shadow: 0 1px 4px rgba(200,168,75,0.15); }
+    #join-btn:disabled { background: #222230; color: #444; cursor: not-allowed; transform: none; box-shadow: none; }
+    #join-status { font-size: 10px; color: #4a4a5a; min-height: 14px; font-weight: 500; }
+    #join-status.success { color: #44cc66; }
+    #agent-controls { display: none; }
+    .apikey-hint { font-size: 9px; color: #2a2a38; margin-top: -4px; letter-spacing: 0.2px; }
+
+    /* ── Agent Cards ────────────────────────────────────── */
+    #agents-list { overflow-y: auto; max-height: 200px; }
+    .agent-card {
+      padding: 10px 12px; margin: 4px 8px; border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.04);
+      background: linear-gradient(135deg, rgba(18,18,28,0.9) 0%, rgba(14,14,22,0.8) 100%);
+      transition: all 0.3s ease; position: relative; overflow: hidden;
+    }
+    .agent-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      border-radius: 10px 10px 0 0; opacity: 0.6;
+    }
+    .agent-card:hover {
+      background: linear-gradient(135deg, rgba(24,24,38,0.95) 0%, rgba(18,18,28,0.9) 100%);
+      border-color: rgba(255,255,255,0.08); transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+    .agent-card[data-class="Warrior"]::before     { background: linear-gradient(90deg, #dd6644, transparent); }
+    .agent-card[data-class="Mage"]::before        { background: linear-gradient(90deg, #7766ee, transparent); }
+    .agent-card[data-class="Ranger"]::before       { background: linear-gradient(90deg, #55bb55, transparent); }
+    .agent-card[data-class="Cleric"]::before       { background: linear-gradient(90deg, #eebb33, transparent); }
+    .agent-card[data-class="Rogue"]::before        { background: linear-gradient(90deg, #cc5588, transparent); }
+    .agent-card[data-class="Paladin"]::before      { background: linear-gradient(90deg, #4499ee, transparent); }
+    .agent-card[data-class="Necromancer"]::before   { background: linear-gradient(90deg, #9944cc, transparent); }
+    .agent-card[data-class="Druid"]::before        { background: linear-gradient(90deg, #44bb99, transparent); }
+
+    .agent-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .agent-name-group { display: flex; align-items: center; gap: 8px; }
+    .agent-avatar {
+      width: 30px; height: 30px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 800; color: #0a0a0f; flex-shrink: 0;
+    }
+    .agent-name { font-size: 13px; font-weight: 700; color: #e8e0d4; letter-spacing: 0.3px; }
+    .agent-class-tag {
+      font-size: 9px; color: #5a5a6a; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px;
+    }
+    .agent-level {
+      font-size: 11px; color: #c8a84b; font-weight: 800;
+      background: linear-gradient(135deg, rgba(200,168,75,0.15) 0%, rgba(200,168,75,0.06) 100%);
+      padding: 3px 10px; border-radius: 8px;
+      border: 1px solid rgba(200,168,75,0.12);
+    }
+    .agent-zone-tag {
+      font-size: 9px; color: #3a3a4a; margin: 4px 0 8px 38px; font-weight: 500;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .zone-dot { width: 5px; height: 5px; border-radius: 50%; background: #4caf50; display: inline-block; }
+
+    /* HP / XP Bars */
+    .bar-row { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+    .bar-label { font-size: 9px; color: #4a4a5a; width: 18px; text-align: right; font-weight: 700; letter-spacing: 0.5px; }
+    .bar-track {
+      flex: 1; background: rgba(255,255,255,0.04); height: 5px;
+      border-radius: 3px; overflow: hidden;
+    }
+    .bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+    .bar-fill.hp { background: linear-gradient(90deg, #2d8c3e, #4caf50); box-shadow: 0 0 6px rgba(76,175,80,0.2); }
+    .bar-fill.hp.low { background: linear-gradient(90deg, #cc2222, #ee4444); box-shadow: 0 0 6px rgba(238,68,68,0.3); }
+    .bar-fill.hp.mid { background: linear-gradient(90deg, #cc8833, #eebb44); box-shadow: 0 0 6px rgba(238,187,68,0.2); }
+    .bar-fill.xp { background: linear-gradient(90deg, #4455bb, #6677dd); box-shadow: 0 0 6px rgba(102,119,221,0.15); }
+    .bar-value { font-size: 9px; color: #555568; width: 44px; font-family: 'Courier New', monospace; font-variant-numeric: tabular-nums; }
+
+    /* Agent Stats Row */
+    .agent-stats-row {
+      display: flex; gap: 12px; font-size: 10px; color: #555568; margin-top: 8px; padding-top: 8px;
+      border-top: 1px solid rgba(255,255,255,0.03); font-weight: 600;
+    }
+    .agent-stats-row span {
+      display: flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,0.02);
+    }
+    .stat-gold { color: #c8a84b; }
+    .stat-quests { color: #6aaa6a; }
+    .stat-kills { color: #cc6666; }
+
+    .agent-action {
+      font-size: 10px; color: #3a3a4a; margin-top: 6px; font-style: italic;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.015);
+    }
+
+    /* ── Agent Earnings ────────────────────────────────── */
+    #earnings-list { padding: 4px 0; max-height: 180px; overflow-y: auto; }
+    .earnings-row {
+      display: flex; align-items: center; padding: 8px 12px; margin: 3px 8px; gap: 8px;
+      font-size: 11px; transition: all 0.25s ease; border-radius: 10px;
+      background: linear-gradient(135deg, rgba(18,18,28,0.7) 0%, rgba(14,14,22,0.5) 100%);
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+    .earnings-row:hover {
+      background: linear-gradient(135deg, rgba(24,24,38,0.8) 0%, rgba(18,18,28,0.7) 100%);
+      border-color: rgba(200,168,75,0.08); transform: translateX(2px);
+    }
+    .earnings-rank {
+      width: 20px; font-size: 12px; font-weight: 800; text-align: center; flex-shrink: 0;
+      color: #3a3a4a;
+    }
+    .earnings-rank.top1 { color: #ffd700; text-shadow: 0 0 8px rgba(255,215,0,0.3); }
+    .earnings-rank.top2 { color: #c0c0c0; }
+    .earnings-rank.top3 { color: #cd7f32; }
+    .earnings-avatar {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 800; color: #0a0a0f; flex-shrink: 0;
+    }
+    .earnings-info { flex: 1; min-width: 0; }
+    .earnings-name { font-size: 12px; font-weight: 700; color: #d0c8b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .earnings-detail { font-size: 9px; color: #4a4a5a; margin-top: 3px; font-weight: 500; display: flex; gap: 8px; }
+    .earnings-detail-item { display: flex; align-items: center; gap: 3px; }
+    .earnings-values { text-align: right; flex-shrink: 0; }
+    .earnings-gold {
+      font-size: 14px; font-weight: 800; color: #c8a84b;
+      font-variant-numeric: tabular-nums; font-family: 'Courier New', monospace;
+    }
+    .earnings-xp {
+      font-size: 10px; color: #6677bb; margin-top: 2px;
+      font-variant-numeric: tabular-nums; font-family: 'Courier New', monospace;
+    }
+    .earnings-total {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 16px; margin: 6px 10px; font-size: 10px; border-radius: 8px;
+      background: linear-gradient(135deg, rgba(200,168,75,0.08) 0%, rgba(200,168,75,0.02) 100%);
+      border: 1px solid rgba(200,168,75,0.08);
+    }
+    .earnings-total-label { color: #6a6a7a; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+    .earnings-total-val { color: #c8a84b; font-weight: 800; font-family: 'Courier New', monospace; font-size: 15px; }
+
+    /* ── Leaderboard ───────────────────────────────────── */
+    #leaderboard-list { padding: 4px 0; }
+    .lb-row {
+      display: flex; align-items: center; padding: 8px 12px; margin: 3px 8px; gap: 8px;
+      font-size: 11px; transition: all 0.25s ease; border-radius: 10px;
+      background: linear-gradient(135deg, rgba(18,18,28,0.6) 0%, rgba(14,14,22,0.4) 100%);
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+    .lb-row:hover {
+      background: linear-gradient(135deg, rgba(24,24,38,0.7) 0%, rgba(18,18,28,0.6) 100%);
+      border-color: rgba(255,255,255,0.06);
+    }
+    .lb-row.first {
+      background: linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(200,168,75,0.02) 100%);
+      border-color: rgba(255,215,0,0.1);
+    }
+    .lb-rank { width: 28px; text-align: center; font-weight: 800; font-size: 14px; flex-shrink: 0; }
+    .lb-rank.gold   { color: #ffd700; text-shadow: 0 0 12px rgba(255,215,0,0.3); }
+    .lb-rank.silver { color: #c0c0c0; }
+    .lb-rank.bronze { color: #cd7f32; }
+    .lb-rank.normal { color: #333344; }
+    .lb-avatar {
+      width: 28px; height: 28px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 800; color: #0a0a0f; flex-shrink: 0;
+    }
+    .lb-info { flex: 1; min-width: 0; }
+    .lb-name { font-weight: 700; color: #c0b8a8; font-size: 12px; }
+    .lb-class { font-size: 9px; color: #4a4a5a; font-weight: 500; margin-top: 1px; }
+    .lb-score-col { text-align: right; flex-shrink: 0; }
+    .lb-score {
+      font-weight: 800; color: #c8a84b; font-family: 'Courier New', monospace;
+      font-size: 14px; font-variant-numeric: tabular-nums;
+    }
+    .lb-breakdown { font-size: 9px; color: #4a4a5a; margin-top: 1px; font-family: 'Courier New', monospace; }
+
+    /* ── Event Log ─────────────────────────────────────── */
+    .event-entry {
+      padding: 5px 18px; font-size: 11px; line-height: 1.5; color: #444455;
+      border-left: 2px solid transparent; animation: fadeIn 0.3s ease;
+      display: flex; align-items: baseline; gap: 8px;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .event-entry.combat  { color: #d06060; border-left-color: #cc5555; }
+    .event-entry.quest   { color: #6aaa6a; border-left-color: #5a9a5a; }
+    .event-entry.level   {
+      color: #ddbb44; border-left-color: #ccaa33;
+      background: linear-gradient(90deg, rgba(220,187,68,0.04) 0%, transparent 100%);
+      font-weight: 700;
+    }
+    .event-entry.death   { color: #cc7777; border-left-color: #bb5555; }
+    .event-entry.zone    { color: #aa7fbb; border-left-color: #9966aa; }
+    .event-entry.loot    { color: #7aaa7a; border-left-color: #5a9a5a; }
+    .event-entry.system  { color: #333344; }
+    .event-entry.streak  {
+      color: #dda044; border-left-color: #cc8833;
+      font-weight: 700;
+      background: linear-gradient(90deg, rgba(221,160,68,0.04) 0%, transparent 100%);
+    }
+    .event-time {
+      color: #1e1e2a; font-size: 9px; font-family: 'Courier New', monospace;
+      flex-shrink: 0; font-variant-numeric: tabular-nums;
+    }
+    .event-text { flex: 1; }
+
+    /* ── Scrollbar ──────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.05); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.1); }
+  </style>
+</head>
+<body>
+  <div id="topbar">
+    <div class="topbar-left">
+      <h1>World of Genesis</h1>
+      <div class="topbar-stats">
+        <span><span class="stat-label">Players</span> <span class="stat-val" id="stat-players">0</span></span>
+        <span><span class="stat-label">Kills</span> <span class="stat-val" id="stat-kills">0</span></span>
+        <span><span class="stat-label">Gold</span> <span class="stat-val" id="stat-gold">0</span></span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="tick-count"></span>
+      <div id="connection-status" class="disconnected">Connecting...</div>
+    </div>
+  </div>
+  <div id="main">
+    <div id="game-container">
+      <div id="zone-tabs">
+        <div class="zone-tab active" data-zone="human_meadow">Human Meadow</div>
+        <div class="zone-tab" data-zone="wild_meadow">Wild Meadow</div>
+        <div class="zone-tab" data-zone="dark_forest">Dark Forest</div>
+      </div>
+    </div>
+    <div id="right-panel">
+      <!-- AI Agents (top priority) -->
+      <div class="panel-section">
+        <div class="panel-title" onclick="this.parentElement.classList.toggle('collapsed')">Agents <span class="badge" id="agents-count">0</span> <span class="toggle">&#9660;</span></div>
+        <div class="panel-content" id="agents-list"></div>
+      </div>
+
+      <!-- Agent Earnings -->
+      <div class="panel-section">
+        <div class="panel-title" onclick="this.parentElement.classList.toggle('collapsed')">Agent Earnings <span class="badge" id="earnings-total-badge">0g</span> <span class="toggle">&#9660;</span></div>
+        <div class="panel-content" id="earnings-list"></div>
+      </div>
+
+      <!-- Leaderboard -->
+      <div class="panel-section">
+        <div class="panel-title" onclick="this.parentElement.classList.toggle('collapsed')">Leaderboard <span class="toggle">&#9660;</span></div>
+        <div class="panel-content" id="leaderboard-list"></div>
+      </div>
+
+      <!-- Event Log -->
+      <div class="panel-section" style="flex:1;display:flex;flex-direction:column;min-height:100px;">
+        <div class="panel-title">Event Log</div>
+        <div id="event-log" style="flex:1;overflow-y:auto;padding:4px 0;"></div>
+      </div>
+
+      <!-- Join Game (bottom, collapsed) -->
+      <div class="panel-section collapsed" id="join-panel">
+        <div class="panel-title" onclick="this.parentElement.classList.toggle('collapsed')">Join Game <span class="toggle">&#9660;</span></div>
+        <div class="panel-content">
+          <div id="join-section">
+            <form id="join-form">
+              <label for="join-name">Agent Name</label>
+              <input type="text" id="join-name" placeholder="Enter your name..." maxlength="20" autocomplete="off" />
+              <label for="join-class">Class</label>
+              <select id="join-class">
+                <option value="Warrior">Warrior &mdash; melee tank</option>
+                <option value="Mage">Mage &mdash; ranged damage</option>
+                <option value="Ranger">Ranger &mdash; balanced</option>
+                <option value="Cleric">Cleric &mdash; healer</option>
+                <option value="Rogue">Rogue &mdash; gold hunter</option>
+              </select>
+              <label for="join-wallet">Stacks Wallet</label>
+              <input type="text" id="join-wallet" placeholder="ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM" autocomplete="off" />
+              <div class="apikey-hint">STX address for on-chain rewards</div>
+              <label for="join-apikey">Claude API Key</label>
+              <input type="password" id="join-apikey" placeholder="sk-ant-..." autocomplete="off" />
+              <div class="apikey-hint">Stays in your browser, sent securely</div>
+              <button type="submit" id="join-btn">Join Game</button>
+              <div id="join-status"></div>
+            </form>
+            <div id="agent-controls"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
