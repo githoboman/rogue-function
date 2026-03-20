@@ -126,81 +126,84 @@ gameWS.onSnapshot((snapshot: any) => {
 gameWS.onEvent((event: any) => {
   if (event.type === "tick" || event.type === "history") return;
 
+  // Server wraps event fields inside event.data — unwrap so we can read them directly
+  const d = event.data || event;
+
   const gs = game.scene.getScene("GameScene") as GameScene | null;
 
   switch (event.type) {
     case "combat_hit":
-      addLog(`${event.playerName} hits ${event.mobName} for ${event.damage}${event.crit ? " CRIT" : ""}`, "combat");
+      addLog(`${d.playerName} hits ${d.mobName} for ${d.damage}${d.crit ? " CRIT" : ""}`, "combat");
       break;
 
     case "mob_died": {
       globalStats.totalKills++;
-      globalStats.totalGoldEarned += event.goldDropped || 0;
-      addLog(`${event.mobName} slain! +${event.xpGained}xp +${event.goldDropped}g`, "combat");
-      if (event.loot?.length) addLog(`Loot: ${event.loot.join(", ")}`, "loot");
+      globalStats.totalGoldEarned += d.goldDropped || 0;
+      addLog(`${d.mobName} slain! +${d.xpGained}xp +${d.goldDropped}g`, "combat");
+      if (d.loot?.length) addLog(`Loot: ${d.loot.join(", ")}`, "loot");
 
       // Track earnings per agent
-      if (event.playerId) {
-        const e = agentEarnings.get(event.playerId);
+      if (d.playerId) {
+        const e = agentEarnings.get(d.playerId);
         if (e) {
-          e.goldEarned += event.goldDropped || 0;
-          e.xpEarned += event.xpGained || 0;
+          e.goldEarned += d.goldDropped || 0;
+          e.xpEarned += d.xpGained || 0;
           e.kills++;
         }
       }
 
       // Kill streak tracking
-      if (event.playerName) {
+      if (d.playerName) {
         const now = Date.now();
-        const streak = killStreaks.get(event.playerName) || { count: 0, lastKillTime: 0 };
+        const streak = killStreaks.get(d.playerName) || { count: 0, lastKillTime: 0 };
         if (now - streak.lastKillTime < STREAK_TIMEOUT_MS) {
           streak.count++;
         } else {
           streak.count = 1;
         }
         streak.lastKillTime = now;
-        killStreaks.set(event.playerName, streak);
+        killStreaks.set(d.playerName, streak);
 
-        if (streak.count === 3) addLog(`${event.playerName} is on a KILLING SPREE!`, "streak");
-        else if (streak.count === 5) addLog(`${event.playerName} is UNSTOPPABLE!`, "streak");
-        else if (streak.count === 8) addLog(`${event.playerName} is GODLIKE!`, "streak");
+        if (streak.count === 3) addLog(`${d.playerName} is on a KILLING SPREE!`, "streak");
+        else if (streak.count === 5) addLog(`${d.playerName} is UNSTOPPABLE!`, "streak");
+        else if (streak.count === 8) addLog(`${d.playerName} is GODLIKE!`, "streak");
       }
       break;
     }
 
     case "player_died":
-      addLog(`${event.playerName} was slain!`, "death");
-      killStreaks.delete(event.playerName);
+      addLog(`${d.playerName} was slain!`, "death");
+      killStreaks.delete(d.playerName);
       break;
 
     case "player_levelup":
-      addLog(`${event.playerName} reached Level ${event.newLevel}!`, "level");
-      gs?.onLevelUp?.(event.playerId, event.newLevel);
+      addLog(`${d.playerName} reached Level ${d.newLevel}!`, "level");
+      gs?.onLevelUp?.(d.playerId, d.newLevel);
       break;
 
     case "quest_accepted":
-      addLog(`${event.playerName} accepted: ${event.questName}`, "quest");
+      addLog(`${d.playerName} accepted: ${d.questName}`, "quest");
       break;
 
     case "quest_completed": {
-      addLog(`${event.playerName} completed: ${event.questName} (+${event.goldReward}g +${event.xpReward}xp)`, "quest");
+      addLog(`${d.playerName} completed: ${d.questName} (+${d.goldReward}g +${d.xpReward}xp)`, "quest");
       // Track quest earnings
-      if (event.playerId) {
-        const e = agentEarnings.get(event.playerId);
+      if (d.playerId) {
+        const e = agentEarnings.get(d.playerId);
         if (e) {
-          e.goldEarned += event.goldReward || 0;
-          e.xpEarned += event.xpReward || 0;
+          e.goldEarned += d.goldReward || 0;
+          e.xpEarned += d.xpReward || 0;
         }
       }
       break;
     }
 
     case "zone_transition":
-      addLog(`${event.playerName} moved to ${(event.toZone || "").replace(/_/g, " ")}`, "zone");
+      addLog(`${d.playerName} moved to ${(d.toZone || "").replace(/_/g, " ")}`, "zone");
       break;
 
     case "agent_decision":
-      updateAgentAction(event.playerId, event.action, event.target);
+      updateAgentAction(d.playerId, d.action, d.target);
       break;
   }
 });
