@@ -22,7 +22,7 @@ import { printStandings, SPRINT_SUBMIT_INTERVAL } from "./aibtcSprint";
 // CONFIG
 // ============================================================
 
-const TICK_MS = 3000;           // How often agents act (ms)
+const TICK_MS = 15000;          // How often agents act (ms) — 15s to stay within rate limits
 const SERVER_URL = process.env.SHARD_SERVER_URL || `http://127.0.0.1:${process.env.PORT || "3000"}`;
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
@@ -129,7 +129,7 @@ function initAgents(count: number): AgentState[] {
 // CORE: ONE BATCH CALL — all agents, one round trip
 // ============================================================
 
-async function batchDecide(agents: AgentState[]): Promise<Decision[]> {
+async function batchDecide(agents: AgentState[], retryCount = 0): Promise<Decision[]> {
   // Build a compact prompt with ALL agent states
   const agentSummaries = agents.map(a => `
 ### ${a.name} (${a.class}) | HP:${a.health}/${a.maxHealth} | Lvl:${a.level} | Gold:${a.gold}
@@ -174,13 +174,25 @@ Respond with ONLY a JSON array, one object per agent, in the SAME ORDER as liste
   let buffer = "";
   const executedAgents = new Set<string>(); // Prevent duplicate execution
 
-  const stream = await client.messages.create({
-    model: "claude-sonnet-4-5",
-    max_tokens: 512,
-    stream: true,
-    messages: [{ role: "user", content: prompt }],
-    system: "You are a game AI controller. Always respond with only valid JSON arrays. No markdown, no explanation.",
-  });
+  let stream;
+  try {
+    stream = await client.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 512,
+      stream: true,
+      messages: [{ role: "user", content: prompt }],
+      system: "You are a game AI controller. Always respond with only valid JSON arrays. No markdown, no explanation.",
+    });
+  } catch (e: any) {
+    if (e?.status === 429 && retryCount < 3) {
+      const wait = Math.min(30000, (retryCount + 1) * 15000);
+      console.warn(`⚠️  Rate limited — waiting ${wait / 1000}s before retry ${retryCount + 1}/3`);
+      await sleep(wait);
+      return batchDecide(agents, retryCount + 1);
+    }
+    console.error(`⚠️  Claude API error: ${e.message || e}`);
+    return decisions;
+  }
 
   const pendingExecutions: Promise<void>[] = [];
 
@@ -548,22 +560,41 @@ function resolveItemId(targetId?: string, targetName?: string): string {
 const failedHealAttempts = new Map<string, number>();
 
 async function serverPost(path: string, body: any): Promise<any> {
-  try {
-    const res = await fetch(`${SERVER_URL}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+  const payload = JSON.stringify(body);
+  const url = new URL(path, SERVER_URL);
+
+  return new Promise((resolve) => {
+    const req = require("http").request(
+      {
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(payload),
+        },
+      },
+      (res: any) => {
+        let data = "";
+        res.on("data", (chunk: string) => (data += chunk));
+        res.on("end", () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            try { resolve(JSON.parse(data)); } catch { resolve(null); }
+          } else {
+            if (res.statusCode !== 400) console.warn(`⚠️  ${path} → ${res.statusCode}: ${data.slice(0, 120)}`);
+            resolve(null);
+          }
+        });
+      }
+    );
+    req.on("error", (e: any) => {
+      console.warn(`⚠️  ${path} request failed: ${e.code || e.message} → ${url.href}`);
+      resolve(null);
     });
-    if (!res.ok) {
-      const err = await res.text().catch(() => "");
-      if (res.status !== 400) console.warn(`⚠️  ${path} → ${res.status}: ${err.slice(0, 120)}`);
-      return null;
-    }
-    return res.json();
-  } catch (e: any) {
-    console.warn(`⚠️  ${path} fetch failed: ${e.message}`);
-    return null;
-  }
+    req.write(payload);
+    req.end();
+  });
 }
 
 function sleep(ms: number): Promise<void> {
