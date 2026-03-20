@@ -22,7 +22,7 @@ import { printStandings, SPRINT_SUBMIT_INTERVAL } from "./aibtcSprint";
 // CONFIG
 // ============================================================
 
-const TICK_MS = 20000;          // How often agents act (ms) — 20s to stay within rate limits
+const TICK_MS = 30000;          // How often agents act (ms) — 30s to stay well within rate limits
 const SERVER_URL = process.env.SHARD_SERVER_URL || `http://127.0.0.1:${process.env.PORT || "3000"}`;
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
@@ -469,7 +469,7 @@ async function runGameLoop(): Promise<void> {
 // ============================================================
 
 async function main(): Promise<void> {
-  const agentCount = Math.min(parseInt(process.env.AGENT_COUNT || "2"), 5);
+  const agentCount = Math.min(parseInt(process.env.AGENT_COUNT || "1"), 5);
   const serverPrivateKey = process.env.SERVER_PRIVATE_KEY;
 
   if (!process.env.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not set");
