@@ -4,5 +4,6 @@ RUN npm install -g pnpm
 COPY package.json ./
 RUN pnpm install --no-frozen-lockfile
 COPY . .
+RUN chmod +x start.sh
 EXPOSE ${PORT:-3000}
-CMD ["pnpm", "exec", "tsx", "src/server.ts"]
+CMD ["sh", "start.sh"]

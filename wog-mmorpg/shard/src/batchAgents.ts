@@ -23,7 +23,7 @@ import { printStandings, SPRINT_SUBMIT_INTERVAL } from "./aibtcSprint";
 // ============================================================
 
 const TICK_MS = 3000;           // How often agents act (ms)
-const SERVER_URL = process.env.SHARD_SERVER_URL || "http://localhost:3000";
+const SERVER_URL = process.env.SHARD_SERVER_URL || `http://localhost:${process.env.PORT || "3000"}`;
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
 // Load character token IDs minted by spawnCharacterNFT.ts
