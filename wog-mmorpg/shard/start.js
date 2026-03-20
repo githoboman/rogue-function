@@ -14,8 +14,11 @@ const shard = spawn("node", ["node_modules/tsx/dist/cli.mjs", "src/server.ts"], 
   env: process.env,
 });
 
-// 2. Wait for server to be healthy, then start agents
+// 2. Wait for server to be healthy, then start agents (once only)
+let agentsStarted = false;
+
 function checkHealth(retries) {
+  if (agentsStarted) return; // guard against double-start
   if (retries <= 0) {
     console.error("Shard failed to start after 60s — starting agents anyway");
     startAgents();
@@ -23,25 +26,28 @@ function checkHealth(retries) {
   }
 
   const req = http.get(`http://127.0.0.1:${PORT}/health`, (res) => {
-    if (res.statusCode === 200) {
+    if (res.statusCode === 200 && !agentsStarted) {
       console.log("Shard is ready! Starting agents...");
       startAgents();
-    } else {
+    } else if (!agentsStarted) {
       setTimeout(() => checkHealth(retries - 1), 2000);
     }
   });
 
   req.on("error", () => {
-    setTimeout(() => checkHealth(retries - 1), 2000);
+    if (!agentsStarted) setTimeout(() => checkHealth(retries - 1), 2000);
   });
 
   req.setTimeout(2000, () => {
     req.destroy();
-    setTimeout(() => checkHealth(retries - 1), 2000);
+    if (!agentsStarted) setTimeout(() => checkHealth(retries - 1), 2000);
   });
 }
 
 function startAgents() {
+  if (agentsStarted) return; // prevent double spawn
+  agentsStarted = true;
+
   const agents = spawn("node", ["node_modules/tsx/dist/cli.mjs", "src/batchAgents.ts"], {
     stdio: "inherit",
     env: process.env,
