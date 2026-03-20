@@ -170,16 +170,12 @@ Respond with ONLY a JSON array, one object per agent, in the SAME ORDER as liste
     why: "default",
   }));
 
-  // Stream the response — parse decisions as they arrive
-  let buffer = "";
-  const executedAgents = new Set<string>(); // Prevent duplicate execution
-
-  let stream;
+  // Non-streaming call (lower memory usage)
+  let response;
   try {
-    stream = await client.messages.create({
+    response = await client.messages.create({
       model: "claude-sonnet-4-5",
       max_tokens: 512,
-      stream: true,
       messages: [{ role: "user", content: prompt }],
       system: "You are a game AI controller. Always respond with only valid JSON arrays. No markdown, no explanation.",
     });
@@ -194,38 +190,25 @@ Respond with ONLY a JSON array, one object per agent, in the SAME ORDER as liste
     return decisions;
   }
 
-  const pendingExecutions: Promise<void>[] = [];
-
-  for await (const chunk of stream) {
-    if (
-      chunk.type === "content_block_delta" &&
-      chunk.delta.type === "text_delta"
-    ) {
-      buffer += chunk.delta.text;
-
-      // Try to parse complete decision objects as they stream in
-      const matches = buffer.matchAll(/\{[^{}]+\}/g);
-      for (const match of matches) {
-        try {
-          const decision = JSON.parse(match[0]) as Decision;
-          const idx = agents.findIndex(a => a.id === decision.agentId);
-          if (idx !== -1 && !executedAgents.has(decision.agentId)) {
-            executedAgents.add(decision.agentId);
-            decisions[idx] = decision;
-            // Execute this agent's decision immediately while others still stream
-            pendingExecutions.push(
-              executeDecision(agents[idx], decision).catch(console.error) as Promise<void>
-            );
-          }
-        } catch {
-          // Incomplete JSON chunk — wait for more tokens
-        }
+  // Parse all decisions from the response
+  const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+  const matches = text.matchAll(/\{[^{}]+\}/g);
+  for (const match of matches) {
+    try {
+      const decision = JSON.parse(match[0]) as Decision;
+      const idx = agents.findIndex(a => a.id === decision.agentId);
+      if (idx !== -1) {
+        decisions[idx] = decision;
       }
+    } catch {
+      // Malformed JSON chunk — skip
     }
   }
 
-  // Wait for all executions to complete before returning
-  await Promise.all(pendingExecutions);
+  // Execute all decisions in parallel
+  await Promise.all(
+    decisions.map((d, i) => executeDecision(agents[i], d).catch(console.error))
+  );
 
   return decisions;
 }
@@ -486,7 +469,7 @@ async function runGameLoop(): Promise<void> {
 // ============================================================
 
 async function main(): Promise<void> {
-  const agentCount = Math.min(parseInt(process.env.AGENT_COUNT || "3"), 5);
+  const agentCount = Math.min(parseInt(process.env.AGENT_COUNT || "2"), 5);
   const serverPrivateKey = process.env.SERVER_PRIVATE_KEY;
 
   if (!process.env.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not set");
