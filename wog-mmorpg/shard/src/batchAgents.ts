@@ -174,7 +174,7 @@ Respond with ONLY a JSON array, one object per agent, in the SAME ORDER as liste
   let response;
   try {
     response = await client.messages.create({
-      model: "claude-3-5-haiku-20241022",
+      model: "claude-sonnet-4-5",
       max_tokens: 400,
       messages: [{ role: "user", content: prompt }],
       system: "You are a game AI controller. Always respond with only valid JSON arrays. No markdown, no explanation.",
