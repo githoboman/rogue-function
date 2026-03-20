@@ -17,7 +17,7 @@ const gameContainer = document.getElementById("game-container")!;
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: "game-container",
-  backgroundColor: "#0a0a14",
+  backgroundColor: "#080810",
   scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
   scene: [PreloadScene, GameScene],
   render: { antialias: false, pixelArt: true },
@@ -31,8 +31,6 @@ window.addEventListener("resize", () => {
 // SERVER URL
 // ============================================================
 
-// VITE_SHARD_URL = full shard URL for Railway (e.g., https://wog-shard.up.railway.app)
-// VITE_WS_URL = direct WebSocket URL override
 const SHARD_URL = (import.meta as any).env?.VITE_SHARD_URL || "";
 const WS_URL = (import.meta as any).env?.VITE_WS_URL
   || (SHARD_URL ? SHARD_URL.replace(/^http/, "ws") + "/ws" : "")
@@ -51,7 +49,18 @@ const globalStats = {
 
 // Kill streak tracking per agent
 const killStreaks = new Map<string, { count: number; lastKillTime: number }>();
-const STREAK_TIMEOUT_MS = 15000; // 15s between kills to maintain streak
+const STREAK_TIMEOUT_MS = 15000;
+
+// Agent earnings tracking
+interface AgentEarnings {
+  name: string;
+  cls: string;
+  goldEarned: number;
+  xpEarned: number;
+  kills: number;
+  questsCompleted: number;
+}
+const agentEarnings = new Map<string, AgentEarnings>();
 
 // ============================================================
 // WEBSOCKET
@@ -64,6 +73,7 @@ gameWS.onSnapshot((snapshot: any) => {
   const agents = snapshot.agents || [];
   updateAgentPanel(agents);
   updateLeaderboard(agents);
+  updateEarnings(agents);
   updateTickCount();
   updateTopbarStats(agents);
 
@@ -83,9 +93,23 @@ gameWS.onSnapshot((snapshot: any) => {
       activeQuests: [],
       nearbyEntities: [],
     }, agent.name, agent.class);
+
+    // Init earnings entry if new
+    if (!agentEarnings.has(agent.id)) {
+      agentEarnings.set(agent.id, {
+        name: agent.name,
+        cls: agent.class,
+        goldEarned: 0,
+        xpEarned: 0,
+        kills: 0,
+        questsCompleted: agent.questsCompleted ?? 0,
+      });
+    } else {
+      const e = agentEarnings.get(agent.id)!;
+      e.questsCompleted = agent.questsCompleted ?? 0;
+    }
   }
 
-  // zones can be object { zoneId: {...} } or array — handle both
   const zoneList = Array.isArray(snapshot.zones)
     ? snapshot.zones
     : Object.entries(snapshot.zones || {}).map(([id, z]: [string, any]) => ({ ...z, id }));
@@ -115,6 +139,16 @@ gameWS.onEvent((event: any) => {
       addLog(`${event.mobName} slain! +${event.xpGained}xp +${event.goldDropped}g`, "combat");
       if (event.loot?.length) addLog(`Loot: ${event.loot.join(", ")}`, "loot");
 
+      // Track earnings per agent
+      if (event.playerId) {
+        const e = agentEarnings.get(event.playerId);
+        if (e) {
+          e.goldEarned += event.goldDropped || 0;
+          e.xpEarned += event.xpGained || 0;
+          e.kills++;
+        }
+      }
+
       // Kill streak tracking
       if (event.playerName) {
         const now = Date.now();
@@ -136,7 +170,6 @@ gameWS.onEvent((event: any) => {
 
     case "player_died":
       addLog(`${event.playerName} was slain!`, "death");
-      // Reset kill streak
       killStreaks.delete(event.playerName);
       break;
 
@@ -149,9 +182,18 @@ gameWS.onEvent((event: any) => {
       addLog(`${event.playerName} accepted: ${event.questName}`, "quest");
       break;
 
-    case "quest_completed":
+    case "quest_completed": {
       addLog(`${event.playerName} completed: ${event.questName} (+${event.goldReward}g +${event.xpReward}xp)`, "quest");
+      // Track quest earnings
+      if (event.playerId) {
+        const e = agentEarnings.get(event.playerId);
+        if (e) {
+          e.goldEarned += event.goldReward || 0;
+          e.xpEarned += event.xpReward || 0;
+        }
+      }
       break;
+    }
 
     case "zone_transition":
       addLog(`${event.playerName} moved to ${(event.toZone || "").replace(/_/g, " ")}`, "zone");
@@ -204,6 +246,11 @@ const ZONE_LABELS: Record<string, string> = {
   human_meadow: "Human Meadow",
   wild_meadow:  "Wild Meadow",
   dark_forest:  "Dark Forest",
+};
+
+const CLASS_COLORS: Record<string, string> = {
+  Warrior: "#dd6644", Mage: "#7766ee", Ranger: "#55bb55", Cleric: "#eebb33",
+  Rogue: "#cc5588", Paladin: "#4499ee", Necromancer: "#9944cc", Druid: "#44bb99",
 };
 
 function updateAgentPanel(agents: any[]): void {
@@ -281,6 +328,49 @@ function updateAgentAction(playerId: string, action: string, target: string): vo
 }
 
 // ============================================================
+// AGENT EARNINGS
+// ============================================================
+
+function updateEarnings(_agents: any[]): void {
+  const panel = document.getElementById("earnings-list");
+  const badgeEl = document.getElementById("earnings-total-badge");
+  if (!panel) return;
+
+  // Collect and sort by gold earned
+  const entries = Array.from(agentEarnings.entries())
+    .map(([id, e]) => ({ id, ...e }))
+    .sort((a, b) => b.goldEarned - a.goldEarned);
+
+  const totalGold = entries.reduce((sum, e) => sum + e.goldEarned, 0);
+  if (badgeEl) badgeEl.textContent = `${formatGold(totalGold)}g`;
+
+  if (entries.length === 0) {
+    panel.innerHTML = `<div style="padding:12px 18px;font-size:10px;color:#2a2a3a;">No earnings yet...</div>`;
+    return;
+  }
+
+  panel.innerHTML = entries.map(e => {
+    const color = CLASS_COLORS[e.cls] || "#888";
+    const initial = e.name.charAt(0).toUpperCase();
+    return `<div class="earnings-row">
+      <div class="earnings-avatar" style="background:${color}">${initial}</div>
+      <div class="earnings-info">
+        <div class="earnings-name">${e.name}</div>
+        <div class="earnings-detail">${e.kills} kills &middot; ${e.questsCompleted} quests</div>
+      </div>
+      <div class="earnings-values">
+        <div class="earnings-gold">${formatGold(e.goldEarned)}g</div>
+        <div class="earnings-xp">${formatGold(e.xpEarned)} xp</div>
+      </div>
+    </div>`;
+  }).join("") + `
+    <div class="earnings-total">
+      <span class="earnings-total-label">Total Earned</span>
+      <span class="earnings-total-val">${formatGold(totalGold)}g</span>
+    </div>`;
+}
+
+// ============================================================
 // LEADERBOARD
 // ============================================================
 
@@ -288,7 +378,6 @@ function updateLeaderboard(agents: any[]): void {
   const panel = document.getElementById("leaderboard-list");
   if (!panel) return;
 
-  // Score = quests*100 + gold + xp
   const scored = agents
     .map(a => ({
       name: a.name,
@@ -365,7 +454,6 @@ function setupJoinForm(): void {
     }
 
     try {
-      // Spawn on the server — wallet enables on-chain rewards
       const res = await fetch(`${API_URL}/spawn`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -378,22 +466,20 @@ function setupJoinForm(): void {
       if (joinStatus) joinStatus.textContent = `Spawned! Playing as ${name}`;
       joinStatus?.classList.add("success");
 
-      // Start autonomous agent loop in browser
       runBrowserAgent(data.playerId, name, cls, apiKey);
 
-      // Hide form, show controls
       form.style.display = "none";
       const controls = document.getElementById("agent-controls");
       if (controls) {
         controls.style.display = "block";
         const walletInfo = wallet
           ? `<span style="color:#c8a84b;font-size:11px;">Earning to: ${wallet.slice(0, 8)}...${wallet.slice(-4)}</span>`
-          : `<span style="color:#555;font-size:11px;">No wallet — rewards are in-game only</span>`;
+          : `<span style="color:#3a3a4a;font-size:11px;">No wallet — rewards are in-game only</span>`;
         controls.innerHTML = `
-          <div style="padding:12px 16px;font-size:12px;color:#44cc66;">
+          <div style="padding:14px 18px;font-size:12px;color:#44cc66;">
             Playing as <b>${name}</b> the ${cls}<br>
             ${walletInfo}<br>
-            <span style="color:#444;font-size:10px;margin-top:4px;display:inline-block;">Your agent is making decisions automatically</span>
+            <span style="color:#333344;font-size:10px;margin-top:4px;display:inline-block;">Your agent is making decisions automatically</span>
           </div>
         `;
       }
@@ -405,8 +491,7 @@ function setupJoinForm(): void {
   });
 }
 
-async function runBrowserAgent(playerId: string, name: string, cls: string, apiKey: string): Promise<void> {
-  // Register the API key server-side — the server proxies AI calls so keys never leave the network
+async function runBrowserAgent(playerId: string, name: string, _cls: string, apiKey: string): Promise<void> {
   try {
     const regRes = await fetch(`${API_URL}/player/register-ai`, {
       method: "POST",
@@ -421,7 +506,6 @@ async function runBrowserAgent(playerId: string, name: string, cls: string, apiK
 
   addLog(`AI agent active — server is making decisions for ${name}`, "system");
 
-  // Poll for action log updates — the server drives the AI loop
   async function pollActions() {
     try {
       const res = await fetch(`${API_URL}/player/ai-status?playerId=${encodeURIComponent(playerId)}`);
