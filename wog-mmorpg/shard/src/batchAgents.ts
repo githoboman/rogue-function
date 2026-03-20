@@ -22,7 +22,7 @@ import { printStandings, SPRINT_SUBMIT_INTERVAL } from "./aibtcSprint";
 // CONFIG
 // ============================================================
 
-const TICK_MS = 15000;          // How often agents act (ms) — 15s to stay within rate limits
+const TICK_MS = 20000;          // How often agents act (ms) — 20s to stay within rate limits
 const SERVER_URL = process.env.SHARD_SERVER_URL || `http://127.0.0.1:${process.env.PORT || "3000"}`;
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
@@ -174,14 +174,14 @@ Respond with ONLY a JSON array, one object per agent, in the SAME ORDER as liste
   let response;
   try {
     response = await client.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 512,
+      model: "claude-haiku-3-5-20241022",
+      max_tokens: 400,
       messages: [{ role: "user", content: prompt }],
       system: "You are a game AI controller. Always respond with only valid JSON arrays. No markdown, no explanation.",
     });
   } catch (e: any) {
     if (e?.status === 429 && retryCount < 3) {
-      const wait = Math.min(30000, (retryCount + 1) * 15000);
+      const wait = Math.min(60000, (retryCount + 1) * 20000);
       console.warn(`⚠️  Rate limited — waiting ${wait / 1000}s before retry ${retryCount + 1}/3`);
       await sleep(wait);
       return batchDecide(agents, retryCount + 1);
