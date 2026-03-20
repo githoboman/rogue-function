@@ -17,7 +17,7 @@ const gameContainer = document.getElementById("game-container")!;
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: "game-container",
-  backgroundColor: "#080810",
+  backgroundColor: "#1a2a18",
   scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
   scene: [PreloadScene, GameScene],
   render: { antialias: false, pixelArt: true },
@@ -267,6 +267,8 @@ function updateAgentPanel(agents: any[]): void {
     const gold    = agent.gold ?? 0;
     const questsDone = agent.questsCompleted ?? 0;
     const xp = agent.xp ?? 0;
+    const color = CLASS_COLORS[agent.class] || "#888";
+    const initial = agent.name.charAt(0).toUpperCase();
 
     if (!card) {
       card = document.createElement("div");
@@ -275,10 +277,16 @@ function updateAgentPanel(agents: any[]): void {
       card.dataset.class = agent.class;
       card.innerHTML = `
         <div class="agent-header">
-          <span class="agent-name">${agent.name}</span>
+          <div class="agent-name-group">
+            <div class="agent-avatar" style="background:${color}">${initial}</div>
+            <div>
+              <div class="agent-name">${agent.name}</div>
+              <div class="agent-class-tag">${agent.class}</div>
+            </div>
+          </div>
           <span class="agent-level" data-lvl>Lv${agent.level}</span>
         </div>
-        <div class="agent-class-zone" data-zone>${agent.class} &middot; ${zone}</div>
+        <div class="agent-zone-tag" data-zone><span class="zone-dot"></span>${zone}</div>
         <div class="bar-row">
           <span class="bar-label">HP</span>
           <div class="bar-track"><div class="bar-fill hp ${hpClass}" data-hp style="width:${Math.round(hpPct*100)}%"></div></div>
@@ -290,8 +298,8 @@ function updateAgentPanel(agents: any[]): void {
           <span class="bar-value" data-xpval>${xp}</span>
         </div>
         <div class="agent-stats-row">
-          <span class="stat-gold"><span class="stat-icon">G</span> <span data-gold>${gold}</span></span>
-          <span class="stat-quests"><span class="stat-icon">Q</span> <span data-quests>${questsDone}</span></span>
+          <span class="stat-gold">G <span data-gold>${gold}</span></span>
+          <span class="stat-quests">Q <span data-quests>${questsDone}</span></span>
         </div>
         <div class="agent-action" data-action>&mdash;</div>
       `;
@@ -314,7 +322,7 @@ function updateAgentPanel(agents: any[]): void {
       if (xpBarEl) xpBarEl.style.width = `${Math.min(100, (xp % 300) / 3)}%`;
       if (xpValEl) xpValEl.textContent = String(xp);
       if (lvlEl) lvlEl.textContent = `Lv${agent.level}`;
-      if (zoneEl) zoneEl.textContent = `${agent.class} \u00B7 ${zone}`;
+      if (zoneEl) zoneEl.innerHTML = `<span class="zone-dot"></span>${zone}`;
       if (goldEl) goldEl.textContent = String(gold);
       if (questsEl) questsEl.textContent = String(questsDone);
     }
@@ -349,14 +357,20 @@ function updateEarnings(_agents: any[]): void {
     return;
   }
 
-  panel.innerHTML = entries.map(e => {
+  panel.innerHTML = entries.map((e, i) => {
     const color = CLASS_COLORS[e.cls] || "#888";
     const initial = e.name.charAt(0).toUpperCase();
+    const rankClass = i === 0 ? "top1" : i === 1 ? "top2" : i === 2 ? "top3" : "";
+    const rankIcon = i === 0 ? "\u{1F947}" : i === 1 ? "\u{1F948}" : i === 2 ? "\u{1F949}" : `${i + 1}`;
     return `<div class="earnings-row">
+      <div class="earnings-rank ${rankClass}">${rankIcon}</div>
       <div class="earnings-avatar" style="background:${color}">${initial}</div>
       <div class="earnings-info">
         <div class="earnings-name">${e.name}</div>
-        <div class="earnings-detail">${e.kills} kills &middot; ${e.questsCompleted} quests</div>
+        <div class="earnings-detail">
+          <span class="earnings-detail-item" style="color:#cc6666">${e.kills} kills</span>
+          <span class="earnings-detail-item" style="color:#6aaa6a">${e.questsCompleted} quests</span>
+        </div>
       </div>
       <div class="earnings-values">
         <div class="earnings-gold">${formatGold(e.goldEarned)}g</div>
@@ -383,6 +397,9 @@ function updateLeaderboard(agents: any[]): void {
       name: a.name,
       cls: a.class,
       score: (a.questsCompleted ?? 0) * 100 + (a.gold ?? 0) + (a.xp ?? 0),
+      gold: a.gold ?? 0,
+      quests: a.questsCompleted ?? 0,
+      xp: a.xp ?? 0,
     }))
     .sort((a, b) => b.score - a.score);
 
@@ -392,10 +409,20 @@ function updateLeaderboard(agents: any[]): void {
   panel.innerHTML = scored.map((s, i) => {
     const rankClass = i < 3 ? medals[i] : "normal";
     const icon = i < 3 ? medalIcons[i] : `${i + 1}`;
-    return `<div class="lb-row">
+    const color = CLASS_COLORS[s.cls] || "#888";
+    const initial = s.name.charAt(0).toUpperCase();
+    const isFirst = i === 0;
+    return `<div class="lb-row${isFirst ? " first" : ""}">
       <span class="lb-rank ${rankClass}">${icon}</span>
-      <span class="lb-name">${s.name}</span>
-      <span class="lb-score">${s.score.toLocaleString()}</span>
+      <div class="lb-avatar" style="background:${color}">${initial}</div>
+      <div class="lb-info">
+        <div class="lb-name">${s.name}</div>
+        <div class="lb-class">${s.cls} &middot; ${s.quests}Q &middot; ${s.gold}G</div>
+      </div>
+      <div class="lb-score-col">
+        <div class="lb-score">${s.score.toLocaleString()}</div>
+        <div class="lb-breakdown">${s.xp}xp</div>
+      </div>
     </div>`;
   }).join("");
 }

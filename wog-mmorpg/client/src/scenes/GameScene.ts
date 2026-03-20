@@ -37,9 +37,9 @@ const MOB_CONFIG: Record<string, { color: number; size: number; shape: string }>
 };
 
 const ZONE_PALETTE: Record<string, { bg: number; grass1: number; grass2: number; grass3: number; detail: number; path: number; pathEdge: number; trees: boolean; tint: number; ambient: number }> = {
-  human_meadow: { bg: 0x5a9e40, grass1: 0x62a848, grass2: 0x4e9236, grass3: 0x6bb450, detail: 0x78c058, path: 0xc4a86a, pathEdge: 0xa89050, trees: false, tint: 0xffffff, ambient: 0xfff8e8 },
-  wild_meadow:  { bg: 0x448830, grass1: 0x4c9438, grass2: 0x3a7a28, grass3: 0x56a040, detail: 0x5aaa44, path: 0x8a7a4a, pathEdge: 0x706838, trees: true,  tint: 0xddeecc, ambient: 0xe8f0d8 },
-  dark_forest:  { bg: 0x1a2428, grass1: 0x202c30, grass2: 0x162020, grass3: 0x243434, detail: 0x2a3838, path: 0x3a3830, pathEdge: 0x2e2e24, trees: true,  tint: 0x667788, ambient: 0x8899aa },
+  human_meadow: { bg: 0x6ab850, grass1: 0x72b858, grass2: 0x5ea846, grass3: 0x7cc460, detail: 0x88d068, path: 0xd4b87a, pathEdge: 0xb8a060, trees: false, tint: 0xffffff, ambient: 0xfffff0 },
+  wild_meadow:  { bg: 0x549840, grass1: 0x5ca448, grass2: 0x4a8a38, grass3: 0x66b050, detail: 0x6aba54, path: 0x9a8a5a, pathEdge: 0x807848, trees: true,  tint: 0xeeffdd, ambient: 0xf0f8e8 },
+  dark_forest:  { bg: 0x243038, grass1: 0x2a3840, grass2: 0x1e2a2a, grass3: 0x304444, detail: 0x364848, path: 0x4a4840, pathEdge: 0x3e3e34, trees: true,  tint: 0x7788aa, ambient: 0x99aabb },
 };
 
 // Tiny-town tilemap indices (12 cols per row, 16×16px, 1px spacing)
@@ -150,8 +150,9 @@ export class GameScene extends Phaser.Scene {
       human_meadow: "Human Meadow", wild_meadow: "Wild Meadow", dark_forest: "Dark Forest",
     };
     this.add.text(this.W / 2, 20, zoneNames[this.currentZone] || "", {
-      fontSize: "13px", color: "#ffffff", fontFamily: "'Segoe UI', Arial, sans-serif",
-    }).setOrigin(0.5, 0).setDepth(100).setAlpha(0.12);
+      fontSize: "14px", color: "#ffffff", fontFamily: "'Segoe UI', Arial, sans-serif",
+      fontStyle: "bold", stroke: "#000000", strokeThickness: 3,
+    }).setOrigin(0.5, 0).setDepth(100).setAlpha(0.25);
 
     // Pan
     this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
@@ -717,8 +718,8 @@ export class GameScene extends Phaser.Scene {
 
     // Name
     const nameLabel = this.add.text(0, -28, name, {
-      fontSize: "8px", color: "#eee4d0", fontFamily: "'Segoe UI', Arial, sans-serif",
-      stroke: "#000000", strokeThickness: 3,
+      fontSize: "9px", color: "#ffffff", fontFamily: "'Segoe UI', Arial, sans-serif",
+      fontStyle: "bold", stroke: "#000000", strokeThickness: 4,
     }).setOrigin(0.5, 1);
     c.add(nameLabel);
 
@@ -813,8 +814,8 @@ export class GameScene extends Phaser.Scene {
 
     // Name
     const nameLabel = this.add.text(0, cfg.size + 6, mob.name || "?", {
-      fontSize: "7px", color: "#cc8866", fontFamily: "'Segoe UI', Arial, sans-serif",
-      stroke: "#000000", strokeThickness: 2,
+      fontSize: "8px", color: "#ee9966", fontFamily: "'Segoe UI', Arial, sans-serif",
+      fontStyle: "bold", stroke: "#000000", strokeThickness: 3,
     }).setOrigin(0.5, 0);
     c.add(nameLabel);
 
