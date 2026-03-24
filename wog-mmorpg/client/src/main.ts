@@ -204,6 +204,8 @@ gameWS.onEvent((event: any) => {
 
     case "agent_decision":
       updateAgentAction(d.playerId, d.action, d.target);
+      // Show action icon in game world
+      gs?.showAgentStatus?.(d.playerId, d.action, d.target);
       break;
   }
 });

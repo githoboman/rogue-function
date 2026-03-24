@@ -85,6 +85,69 @@ interface Decision {
 }
 
 // ============================================================
+// FALLBACK AI — when Claude API is unavailable
+// ============================================================
+
+function fallbackDecision(agent: AgentState): Decision {
+  const hpPct = agent.health / agent.maxHealth;
+  const hasPotion = agent.inventory.some(i => /potion/i.test(i.name) && i.quantity > 0);
+
+  // Low HP: use potion or buy one
+  if (hpPct < 0.3 && hasPotion) {
+    const potion = agent.inventory.find(i => /potion/i.test(i.name) && i.quantity > 0);
+    return { agentId: agent.id, action: "use_potion", targetId: String(potion?.tokenId || "20"), why: "low HP, using potion" };
+  }
+  if (hpPct < 0.3 && agent.gold >= 30) {
+    return { agentId: agent.id, action: "buy_item", targetId: "20", why: "low HP, buying potion" };
+  }
+  if (hpPct < 0.2) {
+    return { agentId: agent.id, action: "wait", why: "critically low HP, resting" };
+  }
+
+  // Complete a quest if ready
+  const readyQuest = agent.activeQuests.find(q => q.progress >= q.goal);
+  if (readyQuest) {
+    return { agentId: agent.id, action: "complete_quest", targetId: readyQuest.id, why: `completing ${readyQuest.name}` };
+  }
+
+  // Accept a quest if none active
+  if (agent.activeQuests.length === 0 && agent.availableQuests.length > 0) {
+    const quest = agent.availableQuests[Math.floor(Math.random() * agent.availableQuests.length)];
+    return { agentId: agent.id, action: "accept_quest", targetId: quest.id, why: `accepting ${quest.name}` };
+  }
+
+  // Attack a nearby mob (prefer ones close to agent level)
+  const mobs = agent.nearbyEntities.filter(e => e.type === "mob");
+  if (mobs.length > 0 && hpPct > 0.35) {
+    // Pick a mob within 3 levels, or the weakest one
+    const suitable = mobs.filter(m => !m.level || m.level <= agent.level + 3);
+    const target = suitable.length > 0
+      ? suitable[Math.floor(Math.random() * suitable.length)]
+      : mobs.reduce((a, b) => (a.level || 99) < (b.level || 99) ? a : b);
+    return { agentId: agent.id, action: "attack", targetId: target.id, why: `attacking ${target.name}` };
+  }
+
+  // Move to a different zone occasionally (10% chance)
+  if (Math.random() < 0.1) {
+    const zones = ["human_meadow", "wild_meadow", "dark_forest"].filter(z => z !== agent.zone);
+    // Only go to dark forest if high enough level
+    const safe = agent.level < 3 ? zones.filter(z => z !== "dark_forest") : zones;
+    if (safe.length > 0) {
+      const zone = safe[Math.floor(Math.random() * safe.length)];
+      return { agentId: agent.id, action: "move", targetId: zone, why: `exploring ${zone}` };
+    }
+  }
+
+  // Default: attack or wait
+  if (mobs.length > 0) {
+    const mob = mobs[Math.floor(Math.random() * mobs.length)];
+    return { agentId: agent.id, action: "attack", targetId: mob.id, why: `attacking ${mob.name}` };
+  }
+
+  return { agentId: agent.id, action: "wait", why: "nothing to do" };
+}
+
+// ============================================================
 // AGENT ROSTER
 // ============================================================
 
@@ -187,6 +250,14 @@ Respond with ONLY a JSON array, one object per agent, in the SAME ORDER as liste
       return batchDecide(agents, retryCount + 1);
     }
     console.error(`⚠️  Claude API error: ${e.message || e}`);
+    // Fallback AI — make smart random decisions so the game stays alive
+    console.log(`🤖 Fallback AI kicking in for ${agents.length} agents`);
+    for (let i = 0; i < agents.length; i++) {
+      decisions[i] = fallbackDecision(agents[i]);
+    }
+    await Promise.all(
+      decisions.map((d, i) => executeDecision(agents[i], d).catch(console.error))
+    );
     return decisions;
   }
 

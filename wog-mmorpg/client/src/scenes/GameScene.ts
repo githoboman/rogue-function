@@ -85,9 +85,14 @@ interface AgentSprite {
   nameLabel: Phaser.GameObjects.Text;
   levelLabel: Phaser.GameObjects.Text;
   actionLabel: Phaser.GameObjects.Text;
+  statusIcon: Phaser.GameObjects.Text;
   cls: string;
   x: number; y: number;
   lastHp: number; lastMaxHp: number;
+  isMoving: boolean;
+  idleTween: Phaser.Tweens.Tween | null;
+  walkTween: Phaser.Tweens.Tween | null;
+  currentAction: string;
 }
 
 interface MobSprite {
@@ -587,10 +592,42 @@ export class GameScene extends Phaser.Scene {
     this.wsClient.on("combat_hit", (e: any) => {
       const s = this.agentSprites.get(e.playerId);
       if (s) {
-        this.dmgPopup(s.container.x, s.container.y - 28, e.damage, e.crit);
-        // Slash effect toward mob
         const m = this.mobSprites.get(e.mobId);
-        if (m) this.slashEffect(s.container.x, s.container.y, m.container.x, m.container.y);
+        if (m) {
+          // Lunge toward mob then bounce back
+          const origX = s.container.x;
+          const origY = s.container.y;
+          const dx = m.container.x - origX;
+          const dy = m.container.y - origY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          // Stop 18px away from mob center
+          const lungeX = dist > 20 ? m.container.x - (dx / dist) * 18 : origX + dx * 0.5;
+          const lungeY = dist > 20 ? m.container.y - (dy / dist) * 18 : origY + dy * 0.5;
+
+          this.tweens.add({
+            targets: s.container, x: lungeX, y: lungeY,
+            duration: 120, ease: "Power2",
+            onComplete: () => {
+              // Slash + damage popup at mob position
+              this.slashEffect(s.container.x, s.container.y, m.container.x, m.container.y);
+              this.dmgPopup(m.container.x, m.container.y - 16, e.damage, e.crit);
+              // Mob recoil
+              const recoilX = m.container.x + (dx / dist) * 4;
+              const recoilY = m.container.y + (dy / dist) * 4;
+              this.tweens.add({ targets: m.container, x: recoilX, y: recoilY, duration: 60, yoyo: true });
+              // Flash mob red on hit
+              if (m.body) this.tweens.add({ targets: m.body, alpha: 0.4, duration: 60, yoyo: true });
+              // Bounce agent back
+              this.tweens.add({
+                targets: s.container, x: origX, y: origY,
+                duration: 200, ease: "Back.easeOut",
+              });
+            },
+          });
+        } else {
+          // No mob found — just show popup at agent
+          this.dmgPopup(s.container.x, s.container.y - 28, e.damage, e.crit);
+        }
         // Screen shake on crit
         if (e.crit) this.cam.shake(150, 0.004);
         // Flash agent on hit
@@ -648,11 +685,51 @@ export class GameScene extends Phaser.Scene {
     }
 
     s.container.setVisible(true);
-    // Ensure full alpha (might have been faded from death)
     if (s.container.alpha < 0.9) s.container.setAlpha(1);
+
     const tx = state.position.x * WORLD_SCALE;
     const ty = state.position.y * WORLD_SCALE;
-    this.tweens.add({ targets: s.container, x: tx, y: ty, duration: 400, ease: "Sine.easeInOut" });
+    const dx = tx - s.x;
+    const dy = ty - s.y;
+    const moved = Math.abs(dx) > 2 || Math.abs(dy) > 2;
+
+    // Flip sprite to face movement direction
+    if (Math.abs(dx) > 4) {
+      const target = s.sprite || s.body;
+      target.setScale(dx < 0 ? -Math.abs(target.scaleX) : Math.abs(target.scaleX), target.scaleY);
+    }
+
+    if (moved) {
+      // Walking — bounce up/down while moving
+      if (!s.isMoving) {
+        s.isMoving = true;
+        s.idleTween?.pause();
+        s.walkTween?.remove();
+        s.walkTween = this.tweens.add({
+          targets: s.sprite || s.body,
+          y: (s.sprite ? -2 : 0) - 3,
+          duration: 100, yoyo: true, repeat: -1, ease: "Sine.easeInOut",
+        });
+      }
+
+      // Dust particles while walking
+      this.spawnDust(s.container.x, s.container.y + 12);
+
+      this.tweens.add({
+        targets: s.container, x: tx, y: ty,
+        duration: 400, ease: "Sine.easeInOut",
+        onComplete: () => {
+          // Stop walk, resume idle
+          s!.isMoving = false;
+          s!.walkTween?.remove();
+          s!.walkTween = null;
+          const target = s!.sprite || s!.body;
+          // Reset to base y
+          target.y = s!.sprite ? -2 : 0;
+          s!.idleTween?.resume();
+        },
+      });
+    }
     s.x = tx; s.y = ty;
 
     if (state.health !== s.lastHp || state.maxHealth !== s.lastMaxHp) {
@@ -660,6 +737,72 @@ export class GameScene extends Phaser.Scene {
       this.drawHpBar(s.hpBar, state.health, state.maxHealth, 28, -20);
     }
     s.levelLabel.setText(`Lv${state.level}`);
+  }
+
+  /** Show a status icon above the agent (sword, scroll, boot, etc) */
+  public showAgentStatus(playerId: string, action: string, target?: string) {
+    const s = this.agentSprites.get(playerId);
+    if (!s) return;
+
+    // Map action to icon
+    const ICONS: Record<string, string> = {
+      attack: "\u2694\uFE0F", move: "\u{1F97E}", quest_accept: "\u{1F4DC}",
+      quest_complete: "\u2705", rest: "\u{1F4A4}", use_item: "\u{1F9EA}",
+      idle: "\u{1F4AD}", zone_move: "\u{1F6B6}",
+    };
+    const icon = ICONS[action] || "\u{1F4AD}";
+
+    // Only update if action changed
+    if (s.currentAction === action) return;
+    s.currentAction = action;
+
+    // Show icon with pop animation
+    s.statusIcon.setText(icon);
+    s.statusIcon.setAlpha(1);
+    s.statusIcon.setScale(0.3);
+    this.tweens.add({
+      targets: s.statusIcon, scaleX: 1, scaleY: 1, duration: 200, ease: "Back.easeOut",
+    });
+    // Gentle float
+    this.tweens.add({
+      targets: s.statusIcon, y: -42, duration: 800, yoyo: true, repeat: 0, ease: "Sine.easeInOut",
+    });
+
+    // Fade out after 2s
+    this.time.delayedCall(2000, () => {
+      if (s.currentAction === action) {
+        this.tweens.add({ targets: s.statusIcon, alpha: 0, duration: 400 });
+      }
+    });
+
+    // Show action text below agent
+    if (target) {
+      s.actionLabel.setText(`${action} ${target}`.slice(0, 28));
+      s.actionLabel.setAlpha(1);
+      this.tweens.add({
+        targets: s.actionLabel, alpha: 0, duration: 400, delay: 2500,
+      });
+    }
+  }
+
+  /** Spawn small dust puffs when agent walks */
+  private spawnDust(x: number, y: number) {
+    for (let i = 0; i < 2; i++) {
+      const dust = this.add.circle(
+        x + Phaser.Math.Between(-6, 6),
+        y + Phaser.Math.Between(-2, 2),
+        Phaser.Math.Between(1, 2),
+        0xbbaa88, 0.4,
+      ).setDepth(0);
+      this.effectLayer.add(dust);
+      this.tweens.add({
+        targets: dust,
+        y: y - Phaser.Math.Between(4, 10),
+        alpha: 0, scaleX: 2, scaleY: 2,
+        duration: Phaser.Math.Between(300, 500),
+        onComplete: () => dust.destroy(),
+      });
+    }
   }
 
   private mkAgent(name: string, cls: string): AgentSprite {
@@ -731,17 +874,38 @@ export class GameScene extends Phaser.Scene {
     c.add(levelLabel);
 
     // Action text
-    const actionLabel = this.add.text(0, 18, "", {
+    const actionLabel = this.add.text(0, 22, "", {
       fontSize: "7px", color: "#556677", fontFamily: "Arial",
+      stroke: "#000000", strokeThickness: 2,
     }).setOrigin(0.5, 0);
     c.add(actionLabel);
+
+    // Status icon (shows what agent is doing — sword, scroll, boot, zzz)
+    const statusIcon = this.add.text(0, -38, "", {
+      fontSize: "14px", color: "#ffffff", fontFamily: "Arial",
+      stroke: "#000000", strokeThickness: 3,
+    }).setOrigin(0.5, 1).setAlpha(0);
+    c.add(statusIcon);
 
     // Click to follow
     const hit = this.add.rectangle(0, 0, 28, 36, 0xffffff, 0).setInteractive();
     c.add(hit);
     hit.on("pointerdown", () => this.cam.startFollow(c, true, 0.08, 0.08));
 
-    return { container: c, body, sprite, hpBar, nameLabel, levelLabel, actionLabel, cls, x: 100, y: 100, lastHp: 100, lastMaxHp: 100 };
+    // Start idle breathing animation
+    const idleTween = this.tweens.add({
+      targets: sprite || body,
+      scaleY: sprite ? 1.55 : 1.04,
+      scaleX: sprite ? 1.48 : 0.97,
+      duration: 1200,
+      yoyo: true, repeat: -1, ease: "Sine.easeInOut",
+    });
+
+    return {
+      container: c, body, sprite, hpBar, nameLabel, levelLabel, actionLabel, statusIcon,
+      cls, x: 100, y: 100, lastHp: 100, lastMaxHp: 100,
+      isMoving: false, idleTween, walkTween: null, currentAction: "",
+    };
   }
 
   // ── Mob Sprites ────────────────────────────────────────
@@ -874,31 +1038,62 @@ export class GameScene extends Phaser.Scene {
   private slashEffect(fromX: number, fromY: number, toX: number, toY: number) {
     const g = this.add.graphics().setDepth(11);
     const angle = Math.atan2(toY - fromY, toX - fromX);
-    const dist = Phaser.Math.Distance.Between(fromX, fromY, toX, toY);
-    const midX = fromX + Math.cos(angle) * dist * 0.6;
-    const midY = fromY + Math.sin(angle) * dist * 0.6;
 
-    // Draw slash arc
-    const slashLen = 14;
+    // Slash appears AT the target mob
+    const hitX = toX;
+    const hitY = toY;
+
+    // Draw 3-line slash burst at impact point
+    const slashLen = 16;
     const perpAngle = angle + Math.PI / 2;
-    g.lineStyle(2, 0xffffff, 0.8);
+
+    // Main slash — thick white
+    g.lineStyle(3, 0xffffff, 0.9);
     g.lineBetween(
-      midX + Math.cos(perpAngle) * slashLen,
-      midY + Math.sin(perpAngle) * slashLen,
-      midX - Math.cos(perpAngle) * slashLen,
-      midY - Math.sin(perpAngle) * slashLen,
+      hitX + Math.cos(perpAngle) * slashLen,
+      hitY + Math.sin(perpAngle) * slashLen,
+      hitX - Math.cos(perpAngle) * slashLen,
+      hitY - Math.sin(perpAngle) * slashLen,
     );
-    // Second slash line at slight angle
-    g.lineStyle(1.5, 0xffdd44, 0.6);
+    // Cross slash — golden
+    g.lineStyle(2, 0xffdd44, 0.7);
     g.lineBetween(
-      midX + Math.cos(perpAngle + 0.3) * slashLen * 0.8,
-      midY + Math.sin(perpAngle + 0.3) * slashLen * 0.8,
-      midX - Math.cos(perpAngle + 0.3) * slashLen * 0.8,
-      midY - Math.sin(perpAngle + 0.3) * slashLen * 0.8,
+      hitX + Math.cos(perpAngle + 0.5) * slashLen * 0.9,
+      hitY + Math.sin(perpAngle + 0.5) * slashLen * 0.9,
+      hitX - Math.cos(perpAngle + 0.5) * slashLen * 0.9,
+      hitY - Math.sin(perpAngle + 0.5) * slashLen * 0.9,
     );
+    // Third slash — thin red
+    g.lineStyle(1.5, 0xff4444, 0.5);
+    g.lineBetween(
+      hitX + Math.cos(perpAngle - 0.4) * slashLen * 0.7,
+      hitY + Math.sin(perpAngle - 0.4) * slashLen * 0.7,
+      hitX - Math.cos(perpAngle - 0.4) * slashLen * 0.7,
+      hitY - Math.sin(perpAngle - 0.4) * slashLen * 0.7,
+    );
+
+    // Impact flash circle
+    const flash = this.add.circle(hitX, hitY, 6, 0xffffff, 0.5).setDepth(11);
+    this.effectLayer.add(flash);
+    this.tweens.add({ targets: flash, scaleX: 2, scaleY: 2, alpha: 0, duration: 180, onComplete: () => flash.destroy() });
+
+    // Small spark particles
+    for (let i = 0; i < 4; i++) {
+      const sparkAngle = perpAngle + (Math.random() - 0.5) * 2;
+      const sparkDist = Phaser.Math.Between(8, 16);
+      const spark = this.add.circle(hitX, hitY, 1.5, 0xffdd44, 0.8).setDepth(11);
+      this.effectLayer.add(spark);
+      this.tweens.add({
+        targets: spark,
+        x: hitX + Math.cos(sparkAngle) * sparkDist,
+        y: hitY + Math.sin(sparkAngle) * sparkDist,
+        alpha: 0, duration: Phaser.Math.Between(150, 300),
+        onComplete: () => spark.destroy(),
+      });
+    }
 
     this.effectLayer.add(g);
-    this.tweens.add({ targets: g, alpha: 0, duration: 250, onComplete: () => g.destroy() });
+    this.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() });
   }
 
   private deathBurst(x: number, y: number, color: number) {

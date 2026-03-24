@@ -6,6 +6,7 @@
  */
 
 import * as crypto from "crypto";
+import * as secp from "@noble/secp256k1";
 
 const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const BTC_ADDRESS = "bc1qzdwtvve2fj0nehys4xrx76k7nt40zawn3w94d7";
@@ -43,12 +44,11 @@ async function sendHeartbeat(): Promise<void> {
     await initKey();
     if (!privKeyHex) return;
 
-    const secp = await import("@noble/secp256k1");
     const timestamp = new Date().toISOString();
     const message = "AIBTC Check-In | " + timestamp;
 
     const btcHash = bitcoinMessageHash(message);
-    const [sig, recovery] = await (secp as any).sign(btcHash, privKeyHex, { recovered: true, der: false });
+    const [sig, recovery] = await (secp as any).sign(btcHash, privKeyHex!, { recovered: true, der: false });
     const flagByte = 39 + recovery;
     const compactSig = Buffer.concat([Buffer.from([flagByte]), Buffer.from(sig)]);
     const signature = compactSig.toString("base64");
