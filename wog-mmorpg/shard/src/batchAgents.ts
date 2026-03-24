@@ -449,11 +449,8 @@ async function runGameLoop(): Promise<void> {
       console.log();
     }
 
-    // 4. Submit sprint scores periodically (in background, non-blocking)
+    // 4. Print sprint standings locally (scores submitted only on-demand via /admin/submit-scores)
     if (tick % SPRINT_SUBMIT_INTERVAL === 0) {
-      serverPost("/blockchain/submit-scores", { agents })
-        .then(r => console.log(`  ⛓️ submit-scores:`, r?.success ? "✅" : r?.error || "failed"))
-        .catch(e => console.log(`  ⛓️ submit-scores error:`, e.message));
       printStandings(agents);
     }
 

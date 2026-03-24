@@ -17,6 +17,7 @@ import type { AgentState } from "./batchAgents";
 import { x402Pay, getPaymentInfo, FACILITATOR_URL } from "./x402";
 import { GameConfig } from "./config";
 import { loadGameState, startAutoSave } from "./persistence";
+import { startHeartbeat } from "./aibtcHeartbeat";
 
 // ============================================================
 // INIT
@@ -707,6 +708,7 @@ server.listen({ port: parseInt(process.env.PORT || "3000"), host: "0.0.0.0" }, (
   if (err) { console.error(err); process.exit(1); }
   console.log(`🚀 HTTP:      ${address}`);
   console.log(`📡 WebSocket: ws://localhost:${process.env.PORT || 3000}/ws\n`);
+  startHeartbeat();
 });
 
 export { server, runtime };
