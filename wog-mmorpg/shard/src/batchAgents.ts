@@ -26,6 +26,9 @@ const TICK_MS = 30000;          // How often agents act (ms) — 30s to stay wel
 const SERVER_URL = process.env.SHARD_SERVER_URL || `http://127.0.0.1:${process.env.PORT || "3000"}`;
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
+// AI_PAUSED=true → skip Claude API entirely, use fallback AI only (saves credits)
+const AI_PAUSED = (process.env.AI_PAUSED || "false").toLowerCase() === "true";
+
 // Load character token IDs minted by spawnCharacterNFT.ts
 function loadCharacterTokenIds(): Record<string, number> {
   const filePath = path.join(__dirname, "../agent-characters.json");
@@ -232,6 +235,18 @@ Respond with ONLY a JSON array, one object per agent, in the SAME ORDER as liste
     action: "wait" as const,
     why: "default",
   }));
+
+  // If AI is paused, skip Claude API entirely and use fallback
+  if (AI_PAUSED) {
+    console.log(`⏸️  AI paused — using fallback AI for ${agents.length} agents`);
+    for (let i = 0; i < agents.length; i++) {
+      decisions[i] = fallbackDecision(agents[i]);
+    }
+    await Promise.all(
+      decisions.map((d, i) => executeDecision(agents[i], d).catch(console.error))
+    );
+    return decisions;
+  }
 
   // Non-streaming call (lower memory usage)
   let response;
