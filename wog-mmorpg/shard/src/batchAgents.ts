@@ -93,63 +93,148 @@ interface Decision {
 // FALLBACK AI — when Claude API is unavailable
 // ============================================================
 
+// Per-agent personality weights for fallback AI
+const PERSONALITY: Record<string, { aggression: number; questFocus: number; caution: number; explorer: number }> = {
+  "Ragnar":  { aggression: 0.8, questFocus: 0.3, caution: 0.2, explorer: 0.4 },  // Warrior — charges in
+  "Lyria":   { aggression: 0.3, questFocus: 0.7, caution: 0.7, explorer: 0.5 },  // Mage — careful, quest-driven
+  "Kira":    { aggression: 0.5, questFocus: 0.8, caution: 0.4, explorer: 0.6 },  // Ranger — efficient quester
+  "Thorn":   { aggression: 0.6, questFocus: 0.4, caution: 0.3, explorer: 0.7 },  // Rogue — gold hunter
+  "Elara":   { aggression: 0.2, questFocus: 0.5, caution: 0.9, explorer: 0.3 },  // Cleric — survival first
+};
+
+// Track recent fallback actions to avoid repetition
+const fallbackHistory: Map<string, string[]> = new Map();
+
 function fallbackDecision(agent: AgentState): Decision {
   const hpPct = agent.health / agent.maxHealth;
   const hasPotion = agent.inventory.some(i => /potion/i.test(i.name) && i.quantity > 0);
+  const p = PERSONALITY[agent.name] || { aggression: 0.5, questFocus: 0.5, caution: 0.5, explorer: 0.5 };
+  const history = fallbackHistory.get(agent.id) || [];
+  const lastAction = history[history.length - 1] || "";
 
-  // Low HP: use potion or buy one
-  if (hpPct < 0.3 && hasPotion) {
-    const potion = agent.inventory.find(i => /potion/i.test(i.name) && i.quantity > 0);
-    return { agentId: agent.id, action: "use_potion", targetId: String(potion?.tokenId || "20"), why: "low HP, using potion" };
-  }
-  if (hpPct < 0.3 && agent.gold >= 30) {
-    return { agentId: agent.id, action: "buy_item", targetId: "20", why: "low HP, buying potion" };
-  }
-  if (hpPct < 0.2) {
-    return { agentId: agent.id, action: "wait", why: "critically low HP, resting" };
-  }
+  // Helper to record action
+  const decide = (d: Decision) => {
+    history.push(d.action);
+    if (history.length > 8) history.shift();
+    fallbackHistory.set(agent.id, history);
+    return d;
+  };
 
-  // Complete a quest if ready
-  const readyQuest = agent.activeQuests.find(q => q.progress >= q.goal);
-  if (readyQuest) {
-    return { agentId: agent.id, action: "complete_quest", targetId: readyQuest.id, why: `completing ${readyQuest.name}` };
-  }
-
-  // Accept a quest if none active
-  if (agent.activeQuests.length === 0 && agent.availableQuests.length > 0) {
-    const quest = agent.availableQuests[Math.floor(Math.random() * agent.availableQuests.length)];
-    return { agentId: agent.id, action: "accept_quest", targetId: quest.id, why: `accepting ${quest.name}` };
-  }
-
-  // Attack a nearby mob (prefer ones close to agent level)
   const mobs = agent.nearbyEntities.filter(e => e.type === "mob");
-  if (mobs.length > 0 && hpPct > 0.35) {
-    // Pick a mob within 3 levels, or the weakest one
-    const suitable = mobs.filter(m => !m.level || m.level <= agent.level + 3);
-    const target = suitable.length > 0
-      ? suitable[Math.floor(Math.random() * suitable.length)]
-      : mobs.reduce((a, b) => (a.level || 99) < (b.level || 99) ? a : b);
-    return { agentId: agent.id, action: "attack", targetId: target.id, why: `attacking ${target.name}` };
+
+  // ── SURVIVAL PRIORITY ──
+  // Critical HP: heal or flee
+  if (hpPct < 0.2) {
+    if (hasPotion) {
+      const potion = agent.inventory.find(i => /potion/i.test(i.name) && i.quantity > 0);
+      return decide({ agentId: agent.id, action: "use_potion", targetId: String(potion?.tokenId || "20"), why: "critical HP — emergency heal" });
+    }
+    if (agent.gold >= 30 && lastAction !== "buy_item") {
+      return decide({ agentId: agent.id, action: "buy_item", targetId: "20", why: "critical HP — buying emergency potion" });
+    }
+    // Flee to human meadow if in dangerous zone
+    if (agent.zone !== "human_meadow") {
+      return decide({ agentId: agent.id, action: "move", targetId: "human_meadow", why: "retreating to safety" });
+    }
+    return decide({ agentId: agent.id, action: "wait", why: "resting — critically wounded" });
   }
 
-  // Move to a different zone occasionally (10% chance)
-  if (Math.random() < 0.1) {
-    const zones = ["human_meadow", "wild_meadow", "dark_forest"].filter(z => z !== agent.zone);
-    // Only go to dark forest if high enough level
-    const safe = agent.level < 3 ? zones.filter(z => z !== "dark_forest") : zones;
-    if (safe.length > 0) {
-      const zone = safe[Math.floor(Math.random() * safe.length)];
-      return { agentId: agent.id, action: "move", targetId: zone, why: `exploring ${zone}` };
+  // Low HP: cautious behavior based on personality
+  if (hpPct < (0.25 + p.caution * 0.2)) {
+    if (hasPotion) {
+      const potion = agent.inventory.find(i => /potion/i.test(i.name) && i.quantity > 0);
+      return decide({ agentId: agent.id, action: "use_potion", targetId: String(potion?.tokenId || "20"), why: "low HP — healing up" });
+    }
+    if (agent.gold >= 30 && lastAction !== "buy_item") {
+      return decide({ agentId: agent.id, action: "buy_item", targetId: "20", why: "low HP — stocking up on potions" });
+    }
+    // Cautious agents wait, aggressive ones keep fighting
+    if (Math.random() > p.aggression) {
+      return decide({ agentId: agent.id, action: "wait", why: "low HP — playing it safe" });
     }
   }
 
-  // Default: attack or wait
-  if (mobs.length > 0) {
-    const mob = mobs[Math.floor(Math.random() * mobs.length)];
-    return { agentId: agent.id, action: "attack", targetId: mob.id, why: `attacking ${mob.name}` };
+  // ── QUEST COMPLETION ──
+  const readyQuest = agent.activeQuests.find(q => q.progress >= q.goal);
+  if (readyQuest) {
+    return decide({ agentId: agent.id, action: "complete_quest", targetId: readyQuest.id, why: `turning in ${readyQuest.name} for ${readyQuest.goldReward}g ${readyQuest.xpReward}xp` });
   }
 
-  return { agentId: agent.id, action: "wait", why: "nothing to do" };
+  // ── QUEST ACCEPTANCE ── (personality-weighted)
+  if (agent.activeQuests.length === 0 && agent.availableQuests.length > 0 && Math.random() < p.questFocus) {
+    // Pick highest reward quest
+    const sorted = [...agent.availableQuests].sort((a, b) => (b.goldReward + b.xpReward) - (a.goldReward + a.xpReward));
+    const quest = sorted[0];
+    return decide({ agentId: agent.id, action: "accept_quest", targetId: quest.id, why: `picking up ${quest.name} (${quest.goldReward}g ${quest.xpReward}xp reward)` });
+  }
+
+  // ── POTION STOCKPILE ── (buy potions if flush with gold and no potions)
+  if (!hasPotion && agent.gold >= 60 && Math.random() < p.caution && lastAction !== "buy_item") {
+    return decide({ agentId: agent.id, action: "buy_item", targetId: "20", why: "stocking potions while rich" });
+  }
+
+  // ── COMBAT ── (personality-driven target selection)
+  if (mobs.length > 0 && hpPct > (0.3 + (1 - p.aggression) * 0.2)) {
+    const suitable = mobs.filter(m => !m.level || m.level <= agent.level + 3);
+    let target;
+
+    if (p.aggression > 0.6) {
+      // Aggressive: pick strongest mob they can handle
+      target = suitable.length > 0
+        ? suitable.reduce((a, b) => (a.level || 0) > (b.level || 0) ? a : b)
+        : mobs[0];
+    } else if (p.questFocus > 0.6 && agent.activeQuests.length > 0) {
+      // Quest-focused: prefer mobs that might match quest objectives
+      target = suitable.length > 0
+        ? suitable[Math.floor(Math.random() * suitable.length)]
+        : mobs[0];
+    } else {
+      // Default: weakest mob for safe grinding
+      target = suitable.length > 0
+        ? suitable.reduce((a, b) => (a.level || 99) < (b.level || 99) ? a : b)
+        : mobs[0];
+    }
+
+    if (target) {
+      return decide({ agentId: agent.id, action: "attack", targetId: target.id, why: `engaging ${target.name}` });
+    }
+  }
+
+  // ── ZONE PROGRESSION ── (move to harder zones as agent levels up)
+  const zoneForLevel: [number, string][] = [
+    [1, "human_meadow"],
+    [3, "wild_meadow"],
+    [5, "dark_forest"],
+  ];
+  const idealZone = zoneForLevel.reduce((z, [lvl, name]) => agent.level >= lvl ? name : z, "human_meadow");
+
+  if (idealZone !== agent.zone && Math.random() < p.explorer * 0.3) {
+    return decide({ agentId: agent.id, action: "move", targetId: idealZone, why: `leveled up enough — heading to ${idealZone.replace("_", " ")}` });
+  }
+
+  // ── EXPLORATION ── (random zone change for variety)
+  if (Math.random() < p.explorer * 0.08) {
+    const zones = ["human_meadow", "wild_meadow", "dark_forest"].filter(z => z !== agent.zone);
+    const safe = agent.level < 3 ? zones.filter(z => z !== "dark_forest") : zones;
+    if (safe.length > 0) {
+      const zone = safe[Math.floor(Math.random() * safe.length)];
+      return decide({ agentId: agent.id, action: "move", targetId: zone, why: `exploring ${zone.replace("_", " ")}` });
+    }
+  }
+
+  // ── FALLBACK ── attack or wait
+  if (mobs.length > 0) {
+    const mob = mobs[Math.floor(Math.random() * mobs.length)];
+    return decide({ agentId: agent.id, action: "attack", targetId: mob.id, why: `grinding ${mob.name}` });
+  }
+
+  // Nothing nearby — move to find mobs
+  if (lastAction === "wait") {
+    const zones = ["human_meadow", "wild_meadow"].filter(z => z !== agent.zone);
+    return decide({ agentId: agent.id, action: "move", targetId: zones[0], why: "no targets — moving to find mobs" });
+  }
+
+  return decide({ agentId: agent.id, action: "wait", why: "surveying the area" });
 }
 
 // ============================================================
