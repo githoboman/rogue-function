@@ -14,6 +14,7 @@ import { mintGold, awardXP } from "./blockchain";
 import { updateLeaderboard } from "./leaderboard";
 import { submitScores } from "./aibtcSprint";
 import type { AgentState } from "./batchAgents";
+import { isAIPaused, setAIPaused } from "./batchAgents";
 import { x402Pay, getPaymentInfo, FACILITATOR_URL } from "./x402";
 import { GameConfig } from "./config";
 import { loadGameState, startAutoSave } from "./persistence";
@@ -100,8 +101,14 @@ server.get("/health", async () => ({
   status: "ok",
   uptime: Math.floor(process.uptime()),
   spectators: broadcaster.spectatorCount,
+  aiPaused: isAIPaused(),
   world: runtime.getFullWorldSnapshot(),
 }));
+
+// AI pause/resume toggle
+server.post("/ai/pause", async () => { setAIPaused(true); return { aiPaused: true, message: "AI paused — agents using fallback AI" }; });
+server.post("/ai/resume", async () => { setAIPaused(false); return { aiPaused: false, message: "AI resumed — agents using Claude API" }; });
+server.get("/ai/status", async () => ({ aiPaused: isAIPaused() }));
 
 // ============================================================
 // SPAWN

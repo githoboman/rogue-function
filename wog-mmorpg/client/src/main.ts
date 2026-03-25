@@ -36,6 +36,7 @@ const WS_URL = (import.meta as any).env?.VITE_WS_URL
   || (SHARD_URL ? SHARD_URL.replace(/^http/, "ws") + "/ws" : "")
   || `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws`;
 const API_URL = SHARD_URL || `${location.protocol}//${location.host}`;
+(window as any).__SHARD_URL = API_URL;
 
 // ============================================================
 // GLOBAL STATS TRACKING
