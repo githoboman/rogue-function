@@ -35,7 +35,7 @@ export const GameConfig = {
 
   // ── Persistence ─────────────────────────────────────────
   SAVE_INTERVAL_MS: 30_000,         // Auto-save every 30 seconds
-  SAVE_FILE: process.env.SAVE_FILE || "game-state.json",
+  SAVE_FILE: process.env.SAVE_FILE || (process.env.RAILWAY_VOLUME_MOUNT_PATH ? process.env.RAILWAY_VOLUME_MOUNT_PATH + "/game-state.json" : "game-state.json"),
 
   // ── Client ──────────────────────────────────────────────
   STREAK_TIMEOUT_MS: 15_000,        // Kill streak window
