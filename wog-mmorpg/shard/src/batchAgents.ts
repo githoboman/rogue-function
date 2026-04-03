@@ -266,7 +266,7 @@ function initAgents(count: number): AgentState[] {
     maxHealth: 100,
     level: 1,
     xp: 0,
-    gold: 0,
+    gold: 50,   // starter gold — enough for 2 Minor Health Potions on day 1
     inventory: [],
     activeQuests: [],
     availableQuests: [],

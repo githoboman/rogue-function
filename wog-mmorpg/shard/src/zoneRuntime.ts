@@ -165,6 +165,14 @@ export class ZoneRuntime {
         }
       }
 
+      // Passive HP regen — 1% of maxHp per tick for alive players out of combat
+      for (const [, player] of zone.players.entries()) {
+        if (player.currentHp > 0 && player.currentHp < player.maxHp) {
+          const regen = Math.max(1, Math.floor(player.maxHp * 0.01));
+          player.currentHp = Math.min(player.maxHp, player.currentHp + regen);
+        }
+      }
+
       // Aggressive mob targeting
       for (const [mobId, mob] of zone.mobs.entries()) {
         if (mob.deadUntil) continue;
