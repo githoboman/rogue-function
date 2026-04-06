@@ -1,0 +1,4 @@
+foxmq-bin/
+foxmq.zip
+*.log
+__pycache__/

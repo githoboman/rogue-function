@@ -1,0 +1,9 @@
+version: "3.9"
+services:
+  foxmq:
+    image: ghcr.io/tashigg/foxmq:0.3.0
+    container_name: foxmq
+    ports:
+      - "1883:1883"   # MQTT
+      - "8080:8080"   # HTTP status
+    restart: unless-stopped
