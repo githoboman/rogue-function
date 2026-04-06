@@ -7,6 +7,7 @@
 import { ZONES, MOB_TEMPLATES, NPCS, ITEM_TEMPLATES, ZoneDefinition } from "./worldData";
 import { resolveCombat, calculateMaxHp, getLevel, checkRespawn } from "./combat";
 import { QuestManager } from "./questSystem";
+import { passiveIncomeTick } from "./propertyMarket";
 
 // ============================================================
 // TYPES (exported — used by server, combat, quests)
@@ -196,6 +197,15 @@ export class ZoneRuntime {
       }
 
       zone.lastTick = now;
+    }
+
+    // Property passive income — runs once per tick across all zones
+    const income = passiveIncomeTick();
+    for (const [playerId, gold] of income) {
+      const player = this.players.get(playerId);
+      if (player) {
+        player.gold += gold;
+      }
     }
   }
 

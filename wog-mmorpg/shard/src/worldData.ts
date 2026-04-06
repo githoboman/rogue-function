@@ -214,6 +214,45 @@ export const NPCS: Record<string, NPCDefinition> = {
 };
 
 // ============================================================
+// PROPERTY DEFINITIONS
+// ============================================================
+
+export type PropertyTier = 1 | 2 | 3 | 4 | 5;
+export const TIER_NAMES: Record<PropertyTier, string> = {
+  1: "Cottage", 2: "House", 3: "Manor", 4: "Castle", 5: "Palace",
+};
+
+export interface PropertyDefinition {
+  id:          string;
+  name:        string;
+  zone:        string;
+  tier:        PropertyTier;
+  priceGold:   number;   // purchase price in wog-gold
+  rentPerTick: number;   // passive gold income per game tick (owner earns this)
+  description: string;
+  tokenId?:    number;   // set after on-chain mint
+}
+
+export const PROPERTIES: PropertyDefinition[] = [
+  // ── Human Meadow ──────────────────────────────────────────
+  { id: "meadow_cottage_1",  name: "Farmer's Cottage",       zone: "human_meadow", tier: 1, priceGold: 200,  rentPerTick: 3,  description: "A modest cottage beside the grain fields." },
+  { id: "meadow_cottage_2",  name: "Riverside Cabin",         zone: "human_meadow", tier: 1, priceGold: 250,  rentPerTick: 4,  description: "Small cabin overlooking the eastern river." },
+  { id: "meadow_house_1",    name: "Miller's House",          zone: "human_meadow", tier: 2, priceGold: 500,  rentPerTick: 9,  description: "A well-built two-story home with a watermill." },
+  { id: "meadow_manor_1",    name: "Aldric's Manor",          zone: "human_meadow", tier: 3, priceGold: 1200, rentPerTick: 22, description: "Former home of the Guard Captain. Stone walls, iron gates." },
+
+  // ── Wild Meadow ───────────────────────────────────────────
+  { id: "wild_cottage_1",    name: "Ranger's Outpost",        zone: "wild_meadow",  tier: 1, priceGold: 350,  rentPerTick: 6,  description: "A scouting post at the edge of the wilds." },
+  { id: "wild_house_1",      name: "Trapper's Lodge",         zone: "wild_meadow",  tier: 2, priceGold: 700,  rentPerTick: 13, description: "Thick walls keep the beasts out. Barely." },
+  { id: "wild_house_2",      name: "Merchant Waystation",     zone: "wild_meadow",  tier: 2, priceGold: 800,  rentPerTick: 15, description: "Caravans stop here. Premium location." },
+  { id: "wild_manor_1",      name: "Elias's Hunting Lodge",   zone: "wild_meadow",  tier: 3, priceGold: 1800, rentPerTick: 34, description: "The ranger's personal estate. Trophy room included." },
+
+  // ── Dark Forest ───────────────────────────────────────────
+  { id: "dark_house_1",      name: "Shadow Warden's Keep",    zone: "dark_forest",  tier: 2, priceGold: 1200, rentPerTick: 22, description: "Only the brave dare own property here." },
+  { id: "dark_manor_1",      name: "Necromancer's Tower",     zone: "dark_forest",  tier: 3, priceGold: 3000, rentPerTick: 58, description: "Ominous. Expensive. Worth it." },
+  { id: "dark_castle_1",     name: "Shadowgate Castle",       zone: "dark_forest",  tier: 4, priceGold: 6000, rentPerTick: 120,"description": "Controls the Dark Forest pass. Ultimate power property." },
+];
+
+// ============================================================
 // ZONE DEFINITIONS
 // ============================================================
 

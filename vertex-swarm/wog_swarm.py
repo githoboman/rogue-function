@@ -13,15 +13,20 @@ Architecture:
     → deterministic conflict resolution without a coordinator.
 
 Topics:
-  wog/heartbeat          - agent state broadcast (HP, gold, zone, level)
-  wog/zone/claim         - claim exclusive rights to a grinding zone
-  wog/zone/yield         - release a zone (on death or retreat)
-  wog/quest/claim        - claim a quest task
-  wog/quest/abandon      - abandon quest (hand off to peers)
-  wog/heal/request       - broadcast low-HP alert, request peer support
-  wog/heal/response      - healthy agent offers to tank while requester heals
-  wog/loot/auction       - announce rare item drop, open bidding
-  wog/loot/bid           - agent bids on item with gold offer
+  wog/heartbeat           - agent state broadcast (HP, gold, zone, level, properties)
+  wog/zone/claim          - claim exclusive rights to a grinding zone
+  wog/zone/yield          - release a zone (on death or retreat)
+  wog/quest/claim         - claim a quest task
+  wog/quest/abandon       - abandon quest (hand off to peers)
+  wog/heal/request        - broadcast low-HP alert, request peer support
+  wog/heal/response       - healthy agent offers to tank while requester heals
+  wog/loot/auction        - announce rare item drop, open bidding
+  wog/loot/bid            - agent bids on item with gold offer
+  wog/property/list       - agent lists owned property for P2P sale
+  wog/property/offer      - peer makes direct offer on a listed property
+  wog/property/sold       - property sale confirmed (consensus-ordered settlement)
+  wog/property/rent       - agent offers to rent their property for passive STX
+  wog/property/distress   - agent died, portfolio going to emergency auction
 
 Run:
   python wog_swarm.py              # all 3 agents in one terminal (threaded)
@@ -58,6 +63,22 @@ RARE_ITEMS = ["Flame Sword", "Shadow Cloak", "Arcane Staff", "Iron Shield"]
 
 ZONE_GOLD_PER_TICK = {"Forest": 8, "Dungeon": 15, "Volcano": 22, "Glacier": 30, "Abyss": 45}
 ZONE_MIN_LEVEL     = {"Forest": 1, "Dungeon": 3,  "Volcano": 5,  "Glacier": 7,  "Abyss": 10}
+
+# ── Property catalog (mirrors wog-property.clar + worldData.ts) ──
+PROPERTY_CATALOG = [
+    {"id": "forest_cottage_1",  "name": "Ranger's Cabin",       "zone": "Forest",  "tier": 1, "price": 200,  "rent_per_tick": 4},
+    {"id": "forest_house_1",    "name": "Huntsman's Lodge",      "zone": "Forest",  "tier": 2, "price": 500,  "rent_per_tick": 9},
+    {"id": "forest_manor_1",    "name": "Forest Warden's Manor", "zone": "Forest",  "tier": 3, "price": 1200, "rent_per_tick": 22},
+    {"id": "dungeon_house_1",   "name": "Dungeon Keeper's Den",  "zone": "Dungeon", "tier": 2, "price": 700,  "rent_per_tick": 14},
+    {"id": "dungeon_manor_1",   "name": "Crypt Lord's Estate",   "zone": "Dungeon", "tier": 3, "price": 1800, "rent_per_tick": 35},
+    {"id": "volcano_manor_1",   "name": "Ember Keep",            "zone": "Volcano", "tier": 3, "price": 3000, "rent_per_tick": 58},
+    {"id": "glacier_castle_1",  "name": "Frostgate Castle",      "zone": "Glacier", "tier": 4, "price": 6000, "rent_per_tick": 120},
+    {"id": "abyss_palace_1",    "name": "Abyssal Palace",        "zone": "Abyss",   "tier": 5, "price": 12000,"rent_per_tick": 250},
+]
+PROPERTY_BY_ID = {p["id"]: p for p in PROPERTY_CATALOG}
+PROPERTIES_BY_ZONE = {}
+for _p in PROPERTY_CATALOG:
+    PROPERTIES_BY_ZONE.setdefault(_p["zone"], []).append(_p)
 
 # ── Agent personalities ──────────────────────────────────────────────
 PERSONALITIES = {
@@ -110,20 +131,26 @@ class WoGAgent:
         self.heal_thr   = p["heal_threshold"]
         self.retreat_thr= p["retreat_threshold"]
 
-        self.gold       = 50
-        self.level      = 1
-        self.xp         = 0
-        self.zone       = None        # currently claimed zone
-        self.quest      = None        # currently claimed quest
-        self.potions    = 2
-        self.alive      = True
-        self.respawn_at = 0           # timestamp for respawn
+        self.gold            = 50
+        self.level           = 1
+        self.xp              = 0
+        self.zone            = None        # currently claimed zone
+        self.quest           = None        # currently claimed quest
+        self.potions         = 2
+        self.alive           = True
+        self.respawn_at      = 0           # timestamp for respawn
+
+        # Property portfolio
+        self.owned_properties = {}    # property_id → catalog entry
+        self.passive_income   = 0     # total passive gold per tick
 
         # P2P state
-        self.peers      = {}          # name → last heartbeat data
-        self.zone_claims= {}          # zone → agent_name (consensus state)
-        self.quest_claims= {}         # quest → agent_name
-        self.pending_bids= {}         # item → {bidder: gold}
+        self.peers            = {}    # name → last heartbeat data
+        self.zone_claims      = {}    # zone → agent_name (consensus state)
+        self.quest_claims     = {}    # quest → agent_name
+        self.pending_bids     = {}    # item → {bidder: gold}
+        self.property_market  = {}    # property_id → {seller, price, timestamp}
+        self.property_offers  = {}    # property_id → {bidder, offer}
 
         self.lock = threading.Lock()
 
@@ -170,6 +197,14 @@ class WoGAgent:
                 self._handle_auction(sender, data)
             elif topic == "wog/loot/bid":
                 self._handle_bid(sender, data)
+            elif topic == "wog/property/list":
+                self._handle_property_list(sender, data)
+            elif topic == "wog/property/offer":
+                self._handle_property_offer(sender, data)
+            elif topic == "wog/property/sold":
+                self._handle_property_sold(sender, data)
+            elif topic == "wog/property/distress":
+                self._handle_property_distress(sender, data)
 
     # ── Message handlers (all run under self.lock) ───────────────────
     def _handle_heartbeat(self, sender, data):
@@ -293,6 +328,92 @@ class WoGAgent:
         })
         print(f"  {self.emoji} [{self.name}] 🆘 Broadcasting HEAL REQUEST ({self.hp}/{self.max_hp} HP)")
 
+    # ── Property market handlers ─────────────────────────────
+    def _handle_property_list(self, sender, data):
+        pid = data["property_id"]
+        price = data["price"]
+        self.property_market[pid] = {"seller": sender, "price": price, "ts": data["timestamp"]}
+        print(f"  [{self.name}] Market: {sender} listed [{data['name']}] for {price}g")
+        # Bid if affordable and we don't own it
+        prop = PROPERTY_BY_ID.get(pid)
+        if prop and prop["id"] not in self.owned_properties and self.gold >= price:
+            desire = random.random() < 0.5  # 50% chance to bid
+            if desire:
+                print(f"  [{self.name}] Making offer on [{data['name']}] for {price}g")
+                publish_json(self.client, "wog/property/offer", {
+                    "agent": self.name, "property_id": pid, "offer": price, "timestamp": now_ms(),
+                })
+
+    def _handle_property_offer(self, sender, data):
+        pid = data["property_id"]
+        offer = data["offer"]
+        # If this is our listed property, accept first valid offer
+        if pid in self.owned_properties and pid in self.property_market:
+            listing = self.property_market[pid]
+            if listing["seller"] == self.name and offer >= listing["price"]:
+                print(f"  [{self.name}] ACCEPTING offer from {sender}: {offer}g for [{PROPERTY_BY_ID.get(pid, {}).get('name', pid)}]")
+                # FoxMQ consensus ordering ensures this message is seen by all in same order
+                publish_json(self.client, "wog/property/sold", {
+                    "agent": self.name, "buyer": sender, "property_id": pid,
+                    "price": offer, "timestamp": now_ms(),
+                })
+                self.gold += offer
+                del self.owned_properties[pid]
+                self._recalc_passive_income()
+                del self.property_market[pid]
+
+    def _handle_property_sold(self, sender, data):
+        pid = data["property_id"]
+        buyer = data["buyer"]
+        price = data["price"]
+        prop = PROPERTY_BY_ID.get(pid, {})
+        print(f"  [{self.name}] SOLD: [{prop.get('name', pid)}] {sender} -> {buyer} for {price}g (P2P, no fees)")
+        if buyer == self.name:
+            self.owned_properties[pid] = prop
+            self.gold -= price
+            self._recalc_passive_income()
+            print(f"  [{self.name}] Portfolio: {len(self.owned_properties)} properties, +{self.passive_income}g/tick passive")
+        self.property_market.pop(pid, None)
+
+    def _handle_property_distress(self, sender, data):
+        # Agent died — their properties go to emergency auction at 60% price
+        for pid in data.get("properties", []):
+            prop = PROPERTY_BY_ID.get(pid)
+            if not prop: continue
+            distress_price = int(prop["price"] * 0.6)
+            self.property_market[pid] = {"seller": sender, "price": distress_price, "ts": now_ms()}
+            print(f"  [{self.name}] DISTRESS SALE: [{prop['name']}] at {distress_price}g (60% of {prop['price']}g)")
+            if self.gold >= distress_price and self.alive:
+                self.owned_properties[pid] = prop
+                self.gold -= distress_price
+                self._recalc_passive_income()
+                print(f"  [{self.name}] Seized distress property [{prop['name']}] — earns {prop['rent_per_tick']}g/tick")
+
+    # ── Property actions ──────────────────────────────────────
+    def _buy_property(self, prop):
+        self.owned_properties[prop["id"]] = prop
+        self.gold -= prop["price"]
+        self._recalc_passive_income()
+        print(f"  [{self.name}] BOUGHT: [{prop['name']}] in {prop['zone']} for {prop['price']}g — +{prop['rent_per_tick']}g/tick")
+        publish_json(self.client, "wog/property/sold", {
+            "agent": "realm", "buyer": self.name, "property_id": prop["id"],
+            "price": prop["price"], "timestamp": now_ms(),
+        })
+
+    def _list_property_for_sale(self, pid, price):
+        prop = self.owned_properties.get(pid)
+        if not prop: return
+        self.property_market[pid] = {"seller": self.name, "price": price, "ts": now_ms()}
+        publish_json(self.client, "wog/property/list", {
+            "agent": self.name, "property_id": pid, "name": prop["name"],
+            "zone": prop["zone"], "tier": prop["tier"],
+            "price": price, "rent_per_tick": prop["rent_per_tick"], "timestamp": now_ms(),
+        })
+        print(f"  [{self.name}] Listed [{prop['name']}] for {price}g")
+
+    def _recalc_passive_income(self):
+        self.passive_income = sum(p["rent_per_tick"] for p in self.owned_properties.values())
+
     def _run_auction(self, item):
         print(f"  {self.emoji} [{self.name}] 🏆 RARE DROP: [{item}] — starting P2P auction!")
         self.pending_bids[item] = {}
@@ -321,6 +442,8 @@ class WoGAgent:
             "gold": self.gold, "level": self.level,
             "zone": self.zone, "quest": self.quest,
             "alive": self.alive, "timestamp": now_ms(),
+            "properties": list(self.owned_properties.keys()),
+            "passive_income": self.passive_income,
         })
 
     # ── Decision engine (no orchestrator) ────────────────────────────
@@ -330,9 +453,14 @@ class WoGAgent:
                 self._respawn()
             return
 
-        # 1. Passive HP regen (1% per tick)
+        # 1. Passive HP regen (1% per tick) + property income
         regen = max(1, int(self.max_hp * 0.01))
         self.hp = min(self.max_hp, self.hp + regen)
+        if self.passive_income > 0:
+            self.gold += self.passive_income
+            # Print occasionally so it's visible in demo
+            if random.random() < 0.3:
+                print(f"  [{self.name}] Passive income: +{self.passive_income}g/tick ({len(self.owned_properties)} properties)")
 
         # 2. Death check
         if self.hp <= 0:
@@ -394,7 +522,27 @@ class WoGAgent:
                 item = random.choice(RARE_ITEMS)
                 self._run_auction(item)
 
-        # 8. Quest completion
+        # 8. Property investment — buy when gold surplus, healthy, not already overloaded
+        if (self.alive and hp_pct > 0.7 and
+                len(self.owned_properties) < 3 and  # cap at 3 for demo clarity
+                random.random() < 0.10):
+            # Find affordable property in current zone first, then any zone
+            zone_props = PROPERTIES_BY_ZONE.get(self.zone, [])
+            all_props = zone_props + [p for p in PROPERTY_CATALOG if p["zone"] != self.zone]
+            for prop in all_props:
+                if prop["id"] not in self.owned_properties and self.gold >= prop["price"]:
+                    self._buy_property(prop)
+                    break
+
+        # 8b. Profit-take — sell a property if price doubled on the market
+        if self.owned_properties and random.random() < 0.04:
+            for pid, prop in list(self.owned_properties.items()):
+                sell_price = int(prop["price"] * 1.5)  # ask 50% premium
+                if pid not in self.property_market:
+                    self._list_property_for_sale(pid, sell_price)
+                    break
+
+        # 9. Quest completion
         if self.quest and random.random() < 0.15:
             reward = random.randint(30, 80)
             self.gold += reward
@@ -421,11 +569,16 @@ class WoGAgent:
             return candidates[mid] if candidates else None
 
     def _die(self):
-        print(f"\n  {self.emoji} [{self.name}] 💀 DIED — yielding zone and quests. Respawning in 10s...")
+        print(f"\n  [{self.name}] DIED — yielding zone, quests, distress-auctioning properties...")
         self.alive = False
         self.hp = 0
         self._yield_zone()
         self._abandon_quest()
+        if self.owned_properties:
+            publish_json(self.client, "wog/property/distress", {
+                "agent": self.name, "properties": list(self.owned_properties.keys()), "timestamp": now_ms(),
+            })
+            print(f"  [{self.name}] DISTRESS: {len(self.owned_properties)} properties up for emergency auction at 60% price")
         self.respawn_at = now_ms() + 10_000
 
     def _respawn(self):

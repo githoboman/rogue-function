@@ -366,6 +366,27 @@
       <div id="panel-earnings" class="panel-view" style="display:none"><div id="earnings-list"></div></div>
       <div id="panel-leaderboard" class="panel-view" style="display:none"><div id="leaderboard-list"></div></div>
       <div id="panel-log" class="panel-view" style="display:none"><div id="event-log"></div></div>
+      <div id="panel-estate" class="panel-view" style="display:none">
+        <div style="padding:12px 16px;border-bottom:1px solid rgba(200,168,75,0.08)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#7a6a40">Property Market</span>
+            <span id="estate-market-count" style="font-size:9px;color:#4a4a5a">Loading...</span>
+          </div>
+          <div style="display:flex;gap:16px;font-size:10px">
+            <span>Total passive: <b id="estate-total-passive" style="color:#e8c860">0g/tick</b></span>
+            <span>Properties owned: <b id="estate-owned-count" style="color:#c8a84b">0</b></span>
+            <span>Listed for sale: <b id="estate-listed-count" style="color:#8a8a9a">0</b></span>
+          </div>
+        </div>
+        <div id="estate-portfolio" style="padding:8px 12px">
+          <div style="font-size:9px;color:#3a3a4a;padding:8px 0;text-transform:uppercase;letter-spacing:1.5px;font-weight:700">Agent Portfolios</div>
+          <div id="estate-portfolio-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px"></div>
+        </div>
+        <div style="padding:0 12px 8px">
+          <div style="font-size:9px;color:#3a3a4a;padding:8px 0;text-transform:uppercase;letter-spacing:1.5px;font-weight:700">Market Listings</div>
+          <div id="estate-listings-list"></div>
+        </div>
+      </div>
       <div id="panel-join" class="panel-view" style="display:none">
         <div id="join-section">
           <form id="join-form">
@@ -414,6 +435,11 @@
       <span class="nav-tab-icon">&#128220;</span>
       <span class="nav-tab-label">Events</span>
     </div>
+    <div class="nav-tab" data-panel="estate" onclick="switchTab(this)">
+      <span class="nav-tab-icon">&#127968;</span>
+      <span class="nav-tab-label">Estate</span>
+      <span class="nav-badge" id="estate-income-badge">0g</span>
+    </div>
     <div class="nav-tab" data-panel="join" onclick="switchTab(this)">
       <span class="nav-tab-icon">&#9876;&#65039;</span>
       <span class="nav-tab-label">Join</span>
@@ -447,8 +473,9 @@
       if (target) target.style.display = 'block';
 
       // Set title
-      const titles = { agents: 'Agents', earnings: 'Agent Earnings', leaderboard: 'Leaderboard', log: 'Event Log', join: 'Join Game' };
+      const titles = { agents: 'Agents', earnings: 'Agent Earnings', leaderboard: 'Leaderboard', log: 'Event Log', join: 'Join Game', estate: 'Property Estate' };
       if (title) title.textContent = titles[panel] || panel;
+      if (panel === 'estate') loadEstatePanel();
 
       overlay.classList.add('open');
       currentPanel = panel;
@@ -478,6 +505,94 @@
         }
       } catch (e) { console.error('AI toggle error:', e); }
     }
+
+    // ── Estate Panel ──────────────────────────────────────────
+    const TIER_NAMES = ['', 'Cottage', 'House', 'Manor', 'Castle', 'Palace'];
+    const TIER_COLORS = ['', '#8a8a9a', '#6a9a6a', '#4a8aba', '#c8a84b', '#e84b8a'];
+
+    async function loadEstatePanel() {
+      try {
+        const [snap, allProps] = await Promise.all([
+          fetch(getShardURL() + '/properties').then(r => r.json()),
+          fetch(getShardURL() + '/properties/all').then(r => r.json()),
+        ]);
+
+        const props = allProps.properties || [];
+        const totalPassive = props.filter(p => p.owner).reduce((s, p) => s + p.rentPerTick, 0);
+        const owned = props.filter(p => p.owner).length;
+        const listed = props.filter(p => p.listedFor).length;
+
+        document.getElementById('estate-total-passive').textContent = totalPassive + 'g/tick';
+        document.getElementById('estate-owned-count').textContent = owned;
+        document.getElementById('estate-listed-count').textContent = listed;
+        document.getElementById('estate-market-count').textContent = props.length + ' properties';
+
+        // Update badge
+        document.getElementById('estate-income-badge').textContent = totalPassive + 'g';
+
+        // Portfolio by agent
+        const byOwner = {};
+        for (const p of props) {
+          if (!p.owner) continue;
+          if (!byOwner[p.owner]) byOwner[p.owner] = [];
+          byOwner[p.owner].push(p);
+        }
+
+        const portfolioEl = document.getElementById('estate-portfolio-list');
+        portfolioEl.innerHTML = Object.entries(byOwner).map(([owner, ownedProps]) => {
+          const income = ownedProps.reduce((s, p) => s + p.rentPerTick, 0);
+          const items = ownedProps.map(p => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.03)">
+              <div>
+                <span style="font-size:10px;color:#c8c8d8">${p.name}</span>
+                <span style="font-size:9px;color:#${TIER_COLORS[p.tier] || '8a8a9a'};margin-left:6px">${TIER_NAMES[p.tier]}</span>
+                <div style="font-size:9px;color:#4a4a5a">${p.zone}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:10px;color:#e8c860">+${p.rentPerTick}g/tick</div>
+                ${p.listedFor ? `<div style="font-size:9px;color:#ff9800">Listed: ${p.listedFor}g</div>` : ''}
+              </div>
+            </div>`).join('');
+          return `
+            <div style="padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);background:rgba(18,18,28,0.8)">
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+                <span style="font-size:10px;font-weight:700;color:#d8cfc0">${owner}</span>
+                <span style="font-size:10px;color:#e8c860;font-weight:700">+${income}g/tick</span>
+              </div>
+              ${items}
+            </div>`;
+        }).join('') || '<div style="padding:12px;font-size:10px;color:#3a3a4a">No properties owned yet — agents are saving up gold</div>';
+
+        // Market listings
+        const listingsEl = document.getElementById('estate-listings-list');
+        const listings = snap.listings || [];
+        listingsEl.innerHTML = listings.length ? listings.map(l => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;margin:3px 0;border-radius:8px;background:rgba(16,16,26,0.8);border:1px solid rgba(255,255,255,0.04)">
+            <div>
+              <span style="font-size:10px;color:#c8c8d8;font-weight:600">${l.name}</span>
+              <span style="font-size:9px;margin-left:8px;padding:2px 6px;border-radius:4px;background:rgba(200,168,75,0.1);color:#c8a84b">${TIER_NAMES[l.tier] || ''}</span>
+              <div style="font-size:9px;color:#4a4a5a;margin-top:2px">${l.zone} · Seller: ${l.ownerName} · Yield: ${l.rentPerTick}g/tick</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:11px;font-weight:700;color:#e8c860">${l.askingPrice}g</div>
+            </div>
+          </div>`).join('')
+          : '<div style="padding:12px;font-size:10px;color:#3a3a4a">No properties listed for sale</div>';
+
+      } catch(e) {
+        document.getElementById('estate-portfolio-list').innerHTML = '<div style="padding:12px;font-size:10px;color:#4a4a5a">Connect to shard server to view estate data</div>';
+      }
+    }
+
+    // Refresh estate badge every 10s when visible
+    setInterval(() => {
+      if (currentPanel === 'estate') loadEstatePanel();
+      // Also update badge in background
+      fetch(getShardURL() + '/properties').then(r => r.json()).then(snap => {
+        const income = (snap.listings || []).reduce((s, l) => s + l.rentPerTick, 0);
+        document.getElementById('estate-income-badge').textContent = snap.owned > 0 ? snap.owned + ' owned' : '0g';
+      }).catch(() => {});
+    }, 10000);
 
     // Fetch initial AI status
     fetch(getShardURL() + '/ai/status').then(r => r.json()).then(data => {

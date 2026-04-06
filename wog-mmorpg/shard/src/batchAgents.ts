@@ -83,7 +83,7 @@ export interface AgentState {
 
 interface Decision {
   agentId: string;
-  action: "attack" | "move" | "accept_quest" | "complete_quest" | "buy_item" | "use_potion" | "wait";
+  action: "attack" | "move" | "accept_quest" | "complete_quest" | "buy_item" | "use_potion" | "wait" | "buy_property" | "list_property";
   targetId?: string;
   targetName?: string;
   why: string;
@@ -171,6 +171,38 @@ function fallbackDecision(agent: AgentState): Decision {
   // ── POTION STOCKPILE ── (buy potions if flush with gold and no potions)
   if (!hasPotion && agent.gold >= 60 && Math.random() < p.caution && lastAction !== "buy_item") {
     return decide({ agentId: agent.id, action: "buy_item", targetId: "20", why: "stocking potions while rich" });
+  }
+
+  // ── PROPERTY INVESTMENT ── (invest gold in property for passive income)
+  // Only when healthy, has surplus gold, and randomly based on personality
+  const investThreshold = p.questFocus > 0.6 ? 300 : p.aggression > 0.6 ? 500 : 400;
+  if (
+    hpPct > 0.7 &&
+    agent.gold >= investThreshold &&
+    lastAction !== "buy_property" &&
+    Math.random() < 0.12  // 12% chance per tick when eligible
+  ) {
+    // Pick cheapest unowned property in current zone, then any zone
+    const ZONE_PROPERTIES: Record<string, { id: string; price: number }[]> = {
+      human_meadow: [
+        { id: "meadow_cottage_1", price: 200 }, { id: "meadow_cottage_2", price: 250 },
+        { id: "meadow_house_1", price: 500 },   { id: "meadow_manor_1", price: 1200 },
+      ],
+      wild_meadow: [
+        { id: "wild_cottage_1", price: 350 }, { id: "wild_house_1", price: 700 },
+        { id: "wild_house_2", price: 800 },   { id: "wild_manor_1", price: 1800 },
+      ],
+      dark_forest: [
+        { id: "dark_house_1", price: 1200 }, { id: "dark_manor_1", price: 3000 },
+        { id: "dark_castle_1", price: 6000 },
+      ],
+    };
+    const zoneProps = ZONE_PROPERTIES[agent.zone] || ZONE_PROPERTIES["human_meadow"];
+    const affordable = zoneProps.filter(prop => agent.gold >= prop.price);
+    if (affordable.length > 0) {
+      const target = affordable[Math.floor(Math.random() * affordable.length)];
+      return decide({ agentId: agent.id, action: "buy_property", targetId: target.id, why: `investing ${target.price}g in property for passive income` });
+    }
   }
 
   // ── COMBAT ── (personality-driven target selection)
@@ -534,6 +566,37 @@ async function executeDecision(agent: AgentState, decision: Decision): Promise<v
           failedHealAttempts.set(agent.id, (failedHealAttempts.get(agent.id) || 0) + 1);
         }
       }
+      break;
+    }
+
+    case "buy_property": {
+      // Agent invests gold in a property for passive income
+      const propertyId = decision.targetId;
+      if (!propertyId) break;
+      const res = await serverPost("/properties/buy", {
+        playerId: agent.playerId,
+        propertyId,
+      });
+      if (res?.success) {
+        console.log(`  🏠 ${label} Bought property: "${res.property?.def?.name}" for ${res.pricePaid}g — earns ${res.property?.def?.rentPerTick}g/tick`);
+        agent.gold -= res.pricePaid || 0;
+      } else {
+        console.log(`  ⚠️ ${label} Property buy failed: ${res?.error}`);
+      }
+      break;
+    }
+
+    case "list_property": {
+      // Agent lists a property for sale (profit-taking)
+      const propertyId = decision.targetId;
+      const price = parseInt(decision.targetName || "0", 10);
+      if (!propertyId || !price) break;
+      await serverPost("/properties/list", {
+        playerId: agent.playerId,
+        propertyId,
+        price,
+      });
+      console.log(`  📋 ${label} Listed property ${propertyId} for ${price}g`);
       break;
     }
 

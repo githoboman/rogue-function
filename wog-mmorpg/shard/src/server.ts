@@ -19,6 +19,11 @@ import { x402Pay, getPaymentInfo, FACILITATOR_URL } from "./x402";
 import { GameConfig } from "./config";
 import { loadGameState, startAutoSave } from "./persistence";
 import { startHeartbeat } from "./aibtcHeartbeat";
+import {
+  buyProperty, listProperty, delistProperty,
+  getPortfolio, getMarketListings, getProperty,
+  getAllProperties, getMarketSnapshot, getTotalPassiveIncome,
+} from "./propertyMarket";
 
 // ============================================================
 // INIT
@@ -152,6 +157,76 @@ server.get("/x402/info", async () => ({
   },
   externalAgentAPI: "GET /agent/info for full docs",
 }));
+
+// ============================================================
+// PROPERTY MARKET API
+// ============================================================
+
+/** Full property market — listings, ownership, passive income rates */
+server.get("/properties", async () => getMarketSnapshot());
+
+/** All properties with owner info */
+server.get("/properties/all", async () => ({
+  properties: getAllProperties().map(p => ({
+    id:          p.def.id,
+    name:        p.def.name,
+    zone:        p.def.zone,
+    tier:        p.def.tier,
+    priceGold:   p.def.priceGold,
+    rentPerTick: p.def.rentPerTick,
+    description: p.def.description,
+    owner:       p.owner,
+    listedFor:   p.listedFor,
+    totalEarned: p.totalEarned,
+  })),
+}));
+
+/** Agent's property portfolio + passive income summary */
+server.get<{ Params: { playerId: string } }>("/properties/portfolio/:playerId", async (req) => {
+  const { playerId } = req.params;
+  const portfolio = getPortfolio(playerId);
+  return {
+    playerId,
+    properties: portfolio.map(p => ({
+      id: p.def.id, name: p.def.name, zone: p.def.zone,
+      tier: p.def.tier, rentPerTick: p.def.rentPerTick,
+      listedFor: p.listedFor, totalEarned: p.totalEarned,
+    })),
+    totalPassiveIncome: getTotalPassiveIncome(playerId),
+    propertyCount: portfolio.length,
+  };
+});
+
+/** Buy a property (agent pays gold from their in-game wallet) */
+server.post<{ Body: { playerId: string; propertyId: string } }>("/properties/buy", async (req) => {
+  const { playerId, propertyId } = req.body as any;
+  const player = runtime.players.get(playerId);
+  if (!player) return { success: false, error: "Player not found" };
+
+  const result = buyProperty(
+    propertyId,
+    playerId,
+    player.name,
+    player.gold,
+    (id, amount) => { const p = runtime.players.get(id); if (p) p.gold -= amount; },
+    (id, amount) => { const p = runtime.players.get(id); if (p) p.gold += amount; },
+  );
+  return result;
+});
+
+/** List a property for sale */
+server.post<{ Body: { playerId: string; propertyId: string; price: number } }>("/properties/list", async (req) => {
+  const { playerId, propertyId, price } = req.body as any;
+  const ok = listProperty(propertyId, playerId, price);
+  return { success: ok, error: ok ? undefined : "Not owner or invalid price" };
+});
+
+/** Delist a property */
+server.post<{ Body: { playerId: string; propertyId: string } }>("/properties/delist", async (req) => {
+  const { playerId, propertyId } = req.body as any;
+  const ok = delistProperty(propertyId, playerId);
+  return { success: ok };
+});
 
 // ============================================================
 // x402 PAID DATA API — external consumers pay STX to query

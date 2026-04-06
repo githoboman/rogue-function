@@ -1,0 +1,196 @@
+/**
+ * propertyMarket.ts — WoG Property Market
+ *
+ * Tracks property ownership, passive income, listings, and P2P sales.
+ * On-chain settlement (wog-property SIP-009) is the source of truth for
+ * ownership; this module is the fast in-memory cache the shard uses every tick.
+ *
+ * Integration points:
+ *  - zoneRuntime.tick() → passiveIncomeTick() adds gold to property owners
+ *  - server.ts → exposes REST endpoints for buy/list/portfolio
+ *  - wog_swarm.py → FoxMQ property market for P2P agent negotiation
+ */
+
+import { PROPERTIES, PropertyDefinition } from "./worldData";
+import { broadcaster } from "./wsEvents";
+
+// ─────────────────────────────────────────────────────────────
+// TYPES
+// ─────────────────────────────────────────────────────────────
+
+export interface PropertyState {
+  def:        PropertyDefinition;
+  owner:      string | null;   // playerId or null (unowned)
+  listedFor:  number | null;   // gold asking price, null = not listed
+  rentedBy:   string[];        // playerIds currently renting
+  acquiredAt: number;          // timestamp
+  totalEarned: number;         // cumulative passive gold paid out
+}
+
+export interface MarketListing {
+  propertyId:  string;
+  name:        string;
+  zone:        string;
+  tier:        number;
+  ownerName:   string;
+  askingPrice: number;
+  rentPerTick: number;
+}
+
+// ─────────────────────────────────────────────────────────────
+// MARKET STATE
+// ─────────────────────────────────────────────────────────────
+
+const properties = new Map<string, PropertyState>();
+
+// Initialise all properties as unowned
+for (const def of PROPERTIES) {
+  properties.set(def.id, {
+    def,
+    owner:       null,
+    listedFor:   null,
+    rentedBy:    [],
+    acquiredAt:  0,
+    totalEarned: 0,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// PASSIVE INCOME — called every game tick by zoneRuntime
+// Returns map of playerId → gold earned this tick
+// ─────────────────────────────────────────────────────────────
+
+export function passiveIncomeTick(): Map<string, number> {
+  const income = new Map<string, number>();
+
+  for (const [, prop] of properties) {
+    if (!prop.owner) continue;
+    const earned = prop.def.rentPerTick;
+    income.set(prop.owner, (income.get(prop.owner) || 0) + earned);
+    prop.totalEarned += earned;
+  }
+
+  return income;
+}
+
+// ─────────────────────────────────────────────────────────────
+// BUY — agent pays gold from their game wallet
+// ─────────────────────────────────────────────────────────────
+
+export interface BuyResult {
+  success: boolean;
+  error?:  string;
+  property?: PropertyState;
+  pricePaid?: number;
+}
+
+export function buyProperty(
+  propertyId: string,
+  buyerId: string,
+  buyerName: string,
+  buyerGold: number,
+  deductGold: (playerId: string, amount: number) => void,
+  awardGold:  (playerId: string, amount: number) => void,
+): BuyResult {
+  const prop = properties.get(propertyId);
+  if (!prop) return { success: false, error: "Property not found" };
+  if (prop.owner === buyerId) return { success: false, error: "You already own this" };
+
+  const price = prop.listedFor ?? prop.def.priceGold;
+
+  if (buyerGold < price) {
+    return { success: false, error: `Need ${price}g, have ${buyerGold}g` };
+  }
+
+  const prevOwner = prop.owner;
+  deductGold(buyerId, price);
+  if (prevOwner) awardGold(prevOwner, price);  // seller gets paid
+
+  prop.owner      = buyerId;
+  prop.listedFor  = null;
+  prop.acquiredAt = Date.now();
+
+  broadcaster.emit({
+    type: "property_sold",
+    data: {
+      propertyId,
+      propertyName: prop.def.name,
+      zone:         prop.def.zone,
+      buyer:        buyerName,
+      seller:       prevOwner ?? "the realm",
+      price,
+    },
+  });
+
+  console.log(`🏠 ${buyerName} bought "${prop.def.name}" for ${price}g`);
+  return { success: true, property: prop, pricePaid: price };
+}
+
+// ─────────────────────────────────────────────────────────────
+// LIST / DELIST
+// ─────────────────────────────────────────────────────────────
+
+export function listProperty(propertyId: string, ownerId: string, price: number): boolean {
+  const prop = properties.get(propertyId);
+  if (!prop || prop.owner !== ownerId || price <= 0) return false;
+  prop.listedFor = price;
+  broadcaster.emit({ type: "property_listed", data: { propertyId, name: prop.def.name, price, zone: prop.def.zone } });
+  return true;
+}
+
+export function delistProperty(propertyId: string, ownerId: string): boolean {
+  const prop = properties.get(propertyId);
+  if (!prop || prop.owner !== ownerId) return false;
+  prop.listedFor = null;
+  return true;
+}
+
+// ─────────────────────────────────────────────────────────────
+// QUERIES
+// ─────────────────────────────────────────────────────────────
+
+export function getPortfolio(playerId: string): PropertyState[] {
+  return [...properties.values()].filter(p => p.owner === playerId);
+}
+
+export function getMarketListings(): MarketListing[] {
+  return [...properties.values()]
+    .filter(p => p.listedFor !== null || p.owner === null)
+    .map(p => ({
+      propertyId:  p.def.id,
+      name:        p.def.name,
+      zone:        p.def.zone,
+      tier:        p.def.tier,
+      ownerName:   p.owner ?? "Realm",
+      askingPrice: p.listedFor ?? p.def.priceGold,
+      rentPerTick: p.def.rentPerTick,
+    }));
+}
+
+export function getProperty(propertyId: string): PropertyState | undefined {
+  return properties.get(propertyId);
+}
+
+export function getAllProperties(): PropertyState[] {
+  return [...properties.values()];
+}
+
+export function getTotalPassiveIncome(playerId: string): number {
+  return getPortfolio(playerId).reduce((sum, p) => sum + p.def.rentPerTick, 0);
+}
+
+export function getMarketSnapshot() {
+  const all = [...properties.values()];
+  return {
+    total:    all.length,
+    owned:    all.filter(p => p.owner).length,
+    listed:   all.filter(p => p.listedFor !== null).length,
+    unowned:  all.filter(p => !p.owner).length,
+    listings: getMarketListings(),
+    topEarners: all
+      .filter(p => p.owner)
+      .sort((a, b) => b.totalEarned - a.totalEarned)
+      .slice(0, 5)
+      .map(p => ({ name: p.def.name, owner: p.owner, earned: p.totalEarned })),
+  };
+}
