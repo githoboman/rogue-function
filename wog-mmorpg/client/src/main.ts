@@ -569,16 +569,26 @@ function setupJoinForm(): void {
       const controls = document.getElementById("agent-controls");
       if (controls) {
         controls.style.display = "block";
-        const walletInfo = wallet
-          ? `<span style="color:#c8a84b;font-size:11px;">Earning to: ${wallet.slice(0, 8)}...${wallet.slice(-4)}</span>`
-          : `<span style="color:#3a3a4a;font-size:11px;">No wallet — rewards are in-game only</span>`;
+        const walletLine = wallet
+          ? `<div class="agent-active-wallet">⛓ Earning to: ${wallet.slice(0, 10)}...${wallet.slice(-4)}</div>`
+          : `<div class="agent-active-wallet" style="color:#2a2a3a">No wallet — in-game rewards only</div>`;
         controls.innerHTML = `
-          <div style="padding:14px 18px;font-size:12px;color:#44cc66;">
-            Playing as <b>${name}</b> the ${cls}<br>
-            ${walletInfo}<br>
-            <span style="color:#333344;font-size:10px;margin-top:4px;display:inline-block;">Your agent is making decisions automatically</span>
+          <div class="agent-active-card">
+            <div class="agent-active-name">✓ ${name} the ${cls}</div>
+            ${walletLine}
+            <div class="agent-active-status">Your agent is making autonomous decisions...</div>
           </div>
         `;
+        // Animate the card in
+        controls.style.opacity = "0";
+        controls.style.transform = "translateY(8px)";
+        setTimeout(() => {
+          if (window._anime) {
+            window._anime.animate(controls, { opacity: [0, 1], translateY: [8, 0], duration: 320, easing: "easeOutCubic" });
+          } else {
+            controls.style.opacity = "1"; controls.style.transform = "";
+          }
+        }, 100);
       }
     } catch (err: any) {
       if (joinStatus) joinStatus.textContent = `Error: ${err.message}`;
