@@ -1,0 +1,46 @@
+{
+  "meadow_cottage_1": {
+    "tokenId": 1,
+    "txid": "18132539fbaeb7654997e22ddd32bb12d86c429e7e3ef92ae560ff5d4d69e9f5"
+  },
+  "meadow_cottage_2": {
+    "tokenId": 2,
+    "txid": "73489231f786026cde955d4bb52ad31aaae5d430d3ef3e36ab9349fe0dff35a7"
+  },
+  "meadow_house_1": {
+    "tokenId": 3,
+    "txid": "cc59fdb86c333986e1394bcd017da27902f000e05c3cc54c493c91522bfe2df1"
+  },
+  "meadow_manor_1": {
+    "tokenId": 4,
+    "txid": "29f665717a505d63f80d2f1a81a7b61578a36688e0e67ef09c4101eeb163ac65"
+  },
+  "wild_cottage_1": {
+    "tokenId": 5,
+    "txid": "5eee6f08b4be5bf524533cd383c8b246042dd052962db4958e64920e4a98cd8b"
+  },
+  "wild_house_1": {
+    "tokenId": 6,
+    "txid": "f9a0cd413448db5bbdd18246e00100d9dc65db0c00d34fb8beba8d410dcdc2f5"
+  },
+  "wild_house_2": {
+    "tokenId": 7,
+    "txid": "c2d90855762c964d7d19bde4f27d8121c4d4c6569834b290d56662618945ee7a"
+  },
+  "wild_manor_1": {
+    "tokenId": 8,
+    "txid": "2cf927e702941354a54daea8e1de8e4b0af9ac6264dc5f9efca8d4a3a466a25b"
+  },
+  "dark_house_1": {
+    "tokenId": 9,
+    "txid": "68474cfa1de1dd4b7f0c5f33b4c09c4bf36e8ea10991126cfaeb2a709f81655f"
+  },
+  "dark_manor_1": {
+    "tokenId": 10,
+    "txid": "696b6b749a9f94fd3dba2f5fe67d6e691f4d0f4d1a3b51721baa56bda7ef065e"
+  },
+  "dark_castle_1": {
+    "tokenId": 11,
+    "txid": "a67bfd29f0c6627d7b47c56d4d0fb0cd347a49041ae56334c9324dca3a4c028d"
+  }
+}

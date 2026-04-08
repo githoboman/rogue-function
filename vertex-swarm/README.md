@@ -7,17 +7,19 @@
 
 ## What This Builds
 
-Three agents — **Ragnar (Warrior)**, **Lyria (Mage)**, **Kira (Ranger)** — operate autonomously in World of Guilds, an MMORPG with on-chain economics on Stacks blockchain. They coordinate purely through FoxMQ P2P messaging:
+Three agents — **Ragnar (Warrior)**, **Lyria (Mage)**, **Kira (Rogue)** — operate autonomously in World of Guilds, an MMORPG with on-chain economics on Stacks blockchain. They coordinate purely through FoxMQ P2P messaging:
 
 | Coordination Type | How It Works (No Orchestrator) |
 |---|---|
 | **Zone claiming** | Agents publish zone claims; FoxMQ consensus ordering resolves conflicts — first message wins, deterministically |
+| **Property market** | Agents publish buy/sell offers on `wog/property/*`; FoxMQ picks the canonical first offer per block |
+| **Distress auctions** | Dying agent broadcasts portfolio at 60% price; fastest peer response wins the property |
 | **Healing negotiation** | Low-HP agent broadcasts a heal request; healthy peers offer coverage; requester takes the first offer |
 | **Quest handoffs** | Dying agent publishes `wog/quest/abandon`; quest-focused peers auto-pick it up |
 | **Loot auctions** | Rare drop triggers P2P auction; agents bid via FoxMQ; highest bid wins — zero middleman fees |
-| **Failure recovery** | Agents detect stale peers via heartbeat timeout; their zones are freed and redistributed automatically |
+| **Failure recovery** | Agents detect stale peers via heartbeat timeout; their zones and properties are freed automatically |
 
-FoxMQ guarantees all agents receive messages in the **same consensus-ordered sequence** — so zone conflicts resolve identically on every node with no coordinator.
+FoxMQ guarantees all agents receive messages in the **same consensus-ordered sequence** — so property disputes and zone conflicts resolve identically on every node with no coordinator.
 
 ---
 
@@ -75,15 +77,19 @@ While all three are running, kill one terminal (`Ctrl+C`). The other two will de
 │  localhost:1883 — consensus-ordered MQTT                  │
 │                                                           │
 │  Topics:                                                  │
-│    wog/heartbeat      ← agent state (HP, gold, zone)     │
-│    wog/zone/claim     ← zone ownership negotiation        │
-│    wog/zone/yield     ← release on death/retreat          │
-│    wog/quest/claim    ← quest assignment                  │
-│    wog/quest/abandon  ← handoff to peers                  │
-│    wog/heal/request   ← low-HP broadcast                  │
-│    wog/heal/response  ← peer offers coverage              │
-│    wog/loot/auction   ← rare item P2P auction             │
-│    wog/loot/bid       ← agents bid with gold              │
+│    wog/heartbeat          ← agent state (HP, gold, zone) │
+│    wog/zone/claim         ← zone ownership negotiation    │
+│    wog/zone/yield         ← release on death/retreat      │
+│    wog/quest/claim        ← quest assignment              │
+│    wog/quest/abandon      ← handoff to peers              │
+│    wog/heal/request       ← low-HP broadcast              │
+│    wog/heal/response      ← peer offers coverage          │
+│    wog/loot/auction       ← rare item P2P auction         │
+│    wog/loot/bid           ← agents bid with gold          │
+│    wog/property/list      ← seller lists property deed    │
+│    wog/property/offer     ← buyer counter-offer           │
+│    wog/property/sold      ← confirmed sale broadcast      │
+│    wog/property/distress  ← 60% liquidation on death      │
 └──────────────┬───────────────────┬───────────────────────┘
                │                   │
     ┌──────────▼──────┐  ┌─────────▼──────┐  ┌────────────▼────┐
@@ -111,17 +117,53 @@ The on-chain layer (Stacks blockchain, SIP-010 gold tokens) provides an immutabl
 
 ---
 
+## The Real Estate Economy (NEW)
+
+Agents invest combat earnings into on-chain property deeds (SIP-009 NFTs) that generate **passive gold income every game tick**.
+
+### Economic Cycle
+
+```
+Fight mobs → earn gold
+    → Buy property deed (SIP-009 on-chain)
+    → Earn passive income (3–120g per tick depending on tier)
+    → List property for sale on wog/property/list
+    → Peers bid via wog/property/offer
+    → FoxMQ consensus picks canonical buyer
+    → On death: distress broadcast at 60% price
+```
+
+### 11 Properties Live on Stacks Testnet
+
+| Property | Tier | Income/Tick | Contract Token ID |
+|----------|------|-------------|-------------------|
+| Farmer's Cottage | 1 | 3g | #1 |
+| Riverside Cabin | 1 | 4g | #2 |
+| Miller's House | 2 | 9g | #3 |
+| Aldric's Manor | 3 | 22g | #4 |
+| Ranger's Outpost | 1 | 6g | #5 |
+| Trapper's Lodge | 2 | 13g | #6 |
+| Merchant Waystation | 2 | 15g | #7 |
+| Elias Hunting Lodge | 3 | 34g | #8 |
+| Shadow Warden Keep | 2 | 22g | #9 |
+| Necromancer Tower | 3 | 58g | #10 |
+| Shadowgate Castle | 4 | 120g | #11 |
+
+**Kira's edge:** monitors `wog/property/distress` exclusively — when Ragnar dies mid-battle, Kira seizes his Shadowgate Castle (120g/tick) before Lyria can respond.
+
+---
+
 ## On-Chain Proof (Stacks Testnet)
 
 All WoG contracts are live on Stacks testnet:
 
-| Contract | Address |
-|---|---|
-| wog-gold (SIP-010) | `ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E.wog-gold` |
-| wog-sprint (leaderboard) | `ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E.wog-sprint` |
-| wog-quests | `ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E.wog-quests` |
+| Contract | Standard | Address |
+|---|---|---|
+| wog-gold | SIP-010 | `ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E.wog-gold` |
+| wog-property | SIP-009 | `ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E.wog-property` |
+| wog-sprint | Custom | `ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E.wog-sprint` |
 
-Explorer: https://explorer.hiro.so/address/ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E?chain=testnet
+Property Explorer: https://explorer.hiro.so/address/ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E.wog-property?chain=testnet
 
 Live game: https://rogue-function.vercel.app
 
