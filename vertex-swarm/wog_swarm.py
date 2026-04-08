@@ -108,7 +108,12 @@ PERSONALITIES = {
 def now_ms():
     return int(time.time() * 1000)
 
+# Per-process monotonic sequence counter — makes consensus ordering visible in logs
+_pub_seq = 0
 def publish_json(client, topic, payload, qos=1):
+    global _pub_seq
+    _pub_seq += 1
+    payload["seq"] = _pub_seq
     client.publish(topic, json.dumps(payload), qos=qos)
 
 def fmt_hp(hp, max_hp):
@@ -219,14 +224,17 @@ class WoGAgent:
 
     def _handle_zone_claim(self, sender, data):
         zone = data["zone"]
-        # FoxMQ consensus ordering: first message wins — no arbitrator needed
+        seq  = data.get("seq", "?")
+        # FoxMQ consensus ordering: first message wins — no arbitrator needed.
+        # Every agent sees the SAME message sequence (BFT guarantee), so every
+        # agent picks the SAME winner without any coordinator.
         if zone not in self.zone_claims:
             self.zone_claims[zone] = sender
-            print(f"  {self.emoji} [{self.name}] 📍 Consensus: {sender} owns {zone}")
+            print(f"  [{self.name}] CONSENSUS ZONE GRANT  seq={seq}: {sender} -> [{zone}]")
         else:
             current = self.zone_claims[zone]
             if current != sender:
-                print(f"  {self.emoji} [{self.name}] ⚡ Zone conflict {zone}: {current} holds vs {sender} — {current} wins (BFT order)")
+                print(f"  [{self.name}] CONSENSUS ZONE REJECT seq={seq}: {sender} conflicts with {current} on [{zone}] => {current} WINS (BFT order)")
 
     def _handle_zone_yield(self, sender, data):
         zone = data["zone"]
@@ -236,9 +244,14 @@ class WoGAgent:
 
     def _handle_quest_claim(self, sender, data):
         quest = data["quest"]
+        seq   = data.get("seq", "?")
         if quest not in self.quest_claims:
             self.quest_claims[quest] = sender
-            print(f"  {self.emoji} [{self.name}] 📜 Consensus: {sender} took quest [{quest}]")
+            print(f"  [{self.name}] CONSENSUS QUEST GRANT  seq={seq}: {sender} -> [{quest}]")
+        else:
+            current = self.quest_claims[quest]
+            if current != sender:
+                print(f"  [{self.name}] CONSENSUS QUEST REJECT seq={seq}: {sender} conflicts with {current} on [{quest}] => {current} WINS")
 
     def _handle_quest_abandon(self, sender, data):
         quest = data["quest"]
@@ -345,14 +358,17 @@ class WoGAgent:
                 })
 
     def _handle_property_offer(self, sender, data):
-        pid = data["property_id"]
+        pid   = data["property_id"]
         offer = data["offer"]
-        # If this is our listed property, accept first valid offer
+        seq   = data.get("seq", "?")
+        # If this is our listed property, accept FIRST valid offer only.
+        # FoxMQ consensus ordering guarantees every agent sees offers in the
+        # same sequence, so the first acceptance is deterministic — no coordinator.
         if pid in self.owned_properties and pid in self.property_market:
             listing = self.property_market[pid]
             if listing["seller"] == self.name and offer >= listing["price"]:
-                print(f"  [{self.name}] ACCEPTING offer from {sender}: {offer}g for [{PROPERTY_BY_ID.get(pid, {}).get('name', pid)}]")
-                # FoxMQ consensus ordering ensures this message is seen by all in same order
+                prop_name = PROPERTY_BY_ID.get(pid, {}).get("name", pid)
+                print(f"  [{self.name}] CONSENSUS PROPERTY SOLD seq={seq}: [{prop_name}] -> {sender} @ {offer}g (first valid offer wins)")
                 publish_json(self.client, "wog/property/sold", {
                     "agent": self.name, "buyer": sender, "property_id": pid,
                     "price": offer, "timestamp": now_ms(),

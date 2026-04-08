@@ -24,6 +24,7 @@ import {
   getPortfolio, getMarketListings, getProperty,
   getAllProperties, getMarketSnapshot, getTotalPassiveIncome,
 } from "./propertyMarket";
+import { startFoxmqBridge, getMeshSnapshot } from "./foxmqBridge";
 
 // ============================================================
 // INIT
@@ -786,11 +787,16 @@ server.post<{ Body: { agent: AgentState } }>("/blockchain/update-leaderboard", a
 // START
 // ============================================================
 
+// ── FoxMQ mesh snapshot endpoint (for Mesh panel in UI) ──────────────
+server.get("/foxmq/snapshot", async () => getMeshSnapshot());
+
 server.listen({ port: parseInt(process.env.PORT || "3000"), host: "0.0.0.0" }, (err, address) => {
   if (err) { console.error(err); process.exit(1); }
   console.log(`🚀 HTTP:      ${address}`);
   console.log(`📡 WebSocket: ws://localhost:${process.env.PORT || 3000}/ws\n`);
   startHeartbeat();
+  // Start FoxMQ bridge (optional — skips gracefully if broker is offline)
+  startFoxmqBridge();
 });
 
 export { server, runtime };

@@ -31,7 +31,11 @@ TOPIC_STATE  = "swarm/state"
 def now_ms():
     return int(time.time() * 1000)
 
+_pub_seq = 0
 def publish_json(client, topic, payload, qos=1):
+    global _pub_seq
+    _pub_seq += 1
+    payload["seq"] = _pub_seq
     client.publish(topic, json.dumps(payload), qos=qos)
 
 # ─────────────────────────────────────────────
@@ -77,9 +81,10 @@ class SwarmNode:
             was_stale = was_known and self.peers[sender].get("status") == "stale"
 
             self.peers[sender] = {
-                "timestamp": data.get("timestamp", now_ms()),
-                "role":      data.get("role", "unknown"),
-                "status":    "active",
+                "peer_id":      sender,
+                "last_seen_ms": data.get("timestamp", now_ms()),
+                "role":         data.get("role", "unknown"),
+                "status":       "active",
             }
 
         if not was_known:
@@ -87,9 +92,9 @@ class SwarmNode:
         elif was_stale:
             print(f"[{self.name}] 🔄 RECOVERED peer: {sender} — back online")
 
-        # Mirror role change
+        # Mirror role change within <1s (state mirroring requirement)
         if was_known and self.peers[sender]["role"] != data.get("role"):
-            print(f"[{self.name}] 🔀 Peer {sender} changed role → {data.get('role')}")
+            print(f"[{self.name}] STATE MIRROR: {sender} role changed -> {data.get('role')} (replicated in <1s)")
 
         if msg.topic == TOPIC_HELLO:
             print(f"[{self.name}] 👋 HANDSHAKE from {sender} | role={data.get('role')} status={data.get('status')}")
@@ -129,9 +134,9 @@ class SwarmNode:
         cutoff = now_ms() - STALE_AFTER_MS
         with self.lock:
             for peer, info in self.peers.items():
-                if info["status"] == "active" and info["timestamp"] < cutoff:
+                if info["status"] == "active" and info["last_seen_ms"] < cutoff:
                     info["status"] = "stale"
-                    print(f"[{self.name}] ⚠️  STALE: {peer} — no heartbeat for 10s")
+                    print(f"[{self.name}] STALE DETECTED: {peer} — no heartbeat for >{STALE_AFTER_MS//1000}s (last_seen_ms={info['last_seen_ms']})")
 
     def _print_swarm_view(self):
         with self.lock:

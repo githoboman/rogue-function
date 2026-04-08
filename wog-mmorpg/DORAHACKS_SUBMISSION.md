@@ -1,144 +1,173 @@
 # Vertex Swarm Challenge 2026 — DoraHacks Submission
 
 ## Project Name
-World of Guilds: Autonomous Agent MMORPG with On-Chain Real Estate
+World of Guilds: Leaderless Agent Economy via Tashi FoxMQ
 
 ## Track
 Track 3: Agent Economy + Warm Up Prize
 
 ## One-Line Summary
-An MMORPG where AI agents fight, buy on-chain real estate, and coordinate a leaderless P2P property market through Tashi FoxMQ — no human, no orchestrator, just autonomous economic agents.
+Three autonomous AI agents coordinate zone control, quest assignments, loot auctions, and a live on-chain property market through Tashi FoxMQ consensus ordering — no orchestrator, no shared server, no human in the loop.
 
 ---
 
-## Description
+## The Core Idea
 
-### The Problem
-Most multi-agent AI systems require a central orchestrator: one process that receives all agent outputs, resolves conflicts, and issues commands. This creates a single point of failure, limits scale, and violates the spirit of a decentralized agent economy.
+**FoxMQ is the authority. Not any single agent.**
 
-### The Solution — World of Guilds
+When Ragnar and Kira simultaneously claim the same dungeon zone, FoxMQ's Byzantine fault-tolerant ordering picks the canonical first message. Both agents see the *same* sequence. Both agents compute the *same* winner. No mediator required.
 
-World of Guilds is an autonomous MMORPG where three AI agents (Ragnar the Warrior, Lyria the Mage, Kira the Rogue) operate inside a game world with no master controller. They:
-
-1. **Fight mobs and complete quests** — earning in-game gold settled on the Stacks blockchain (SIP-010)
-2. **Buy property deeds** — 11 SIP-009 NFTs minted on Stacks testnet, each generating passive gold income every game tick
-3. **Negotiate the property market** — via Tashi FoxMQ (Vertex's Byzantine fault-tolerant MQTT 5.0 broker), agents publish listings, counter-offers, and distress sales
-4. **Die and liquidate** — when an agent's HP drops to 0, it broadcasts its entire property portfolio at 60% price to all peers; the fastest responder claims it
-
-### Why Tashi FoxMQ is the Right Layer
-
-Property disputes are resolved by **consensus ordering, not a central server**. When two agents simultaneously offer to buy the same property, FoxMQ's Byzantine fault-tolerant sequencing picks the canonical first message — the same way blockchain miners pick the canonical first transaction. No agent can game the system by flooding the channel.
-
-This maps directly to Vertex Track 3's requirement: **leaderless multi-agent coordination** where the protocol layer (not any single agent) is the authority.
-
-### Vertex Integration Points
-
-| FoxMQ Topic | Publisher | Subscribers | Purpose |
-|-------------|-----------|-------------|---------|
-| `wog/property/list` | Seller agent | All agents | Broadcast listing with asking price |
-| `wog/property/offer` | Buyer agent | Seller + all | Counter-offer, triggers negotiation |
-| `wog/property/sold` | Shard server | All agents | Confirmed sale, update local state |
-| `wog/property/distress` | Dying agent | All agents | 60% liquidation auction on death |
-| `wog/agent/state` | Each agent | All agents | HP, gold, portfolio, zone |
-| `wog/zone/event` | Shard server | All agents | Combat, mobs, quests, level-ups |
+This is the exact guarantee blockchain gives you for transaction ordering — applied to real-time multi-agent coordination at millisecond latency.
 
 ---
 
-## Technical Architecture
+## What We Built
 
-```
-[Ragnar]  [Lyria]  [Kira]         ← Python agents (Claude Haiku 4.5 / fallback AI)
-    \         |        /
-     \        |       /
-      [Tashi FoxMQ Broker]         ← Vertex: Byzantine consensus ordering
-           |
-      [WoG Shard]                  ← Node.js: propertyMarket.ts, passiveIncomeTick()
-           |
-      [Stacks Testnet]             ← SIP-009 wog-property, SIP-010 wog-gold
+### The Warm Up: Stateful Handshake
+
+Two agents (`alpha`, `beta`) running `warmup.py` demonstrate the core primitives the Vertex spec requires:
+
+| Requirement | Implementation |
+|-------------|----------------|
+| HELLO handshake on connect | `swarm/hello` — JSON with `peer_id`, `role`, `timestamp` |
+| Periodic HEARTBEAT | `swarm/state` every 3 seconds |
+| Replicated state | `last_seen_ms`, `role`, `status` tracked per peer |
+| State mirroring <1s | Role change detected and logged in next heartbeat cycle |
+| Stale detection >10s | `last_seen_ms` checked against `STALE_AFTER_MS=10000` |
+| Recovery | Peer returns → `RECOVERED` log, state restored |
+
+Run:
+```bash
+python vertex-swarm/warmup.py alpha   # terminal 1
+python vertex-swarm/warmup.py beta    # terminal 2
+# Kill one — watch stale detection. Restart — watch recovery.
 ```
 
-**Agent decision loop (every 30s):**
-1. Agent reads world state from shard (HTTP GET)
-2. Claude Haiku decides: attack / quest / buy_property / list_property / rest
-3. If `buy_property`: POST to shard, shard settles on-chain
-4. Agent publishes state update to FoxMQ (`wog/agent/state`)
-5. All other agents update their local world model
+### Track 3: The Agent Economy
 
-**Property passive income:**
-- Every game tick, `passiveIncomeTick()` iterates all owned properties
-- Gold awarded to the owning agent's in-game balance
-- Tier 4 Shadowgate Castle: 120g/tick → ~240g/minute at 30s ticks
+Three agents — **Ragnar (Warrior)**, **Lyria (Mage)**, **Kira (Rogue)** — run in `wog_swarm.py`. They coordinate six distinct economic actions purely through FoxMQ:
+
+| FoxMQ Topic | What It Coordinates | Consensus Guarantee |
+|-------------|---------------------|---------------------|
+| `wog/zone/claim` | Exclusive grinding zone assignment | First claim in sequence wins; all agents see same result |
+| `wog/quest/claim` | Quest task ownership | Same as zone — no duplicate assignment possible |
+| `wog/heal/request` | Low-HP broadcast for peer tanking | Healthy peers offer cover; requester takes first response |
+| `wog/loot/auction` | Rare item P2P auction | Bids collected for 4s; highest wins; seller self-settles |
+| `wog/property/*` | Property deed buy/sell/distress | Seller accepts first valid offer in consensus order |
+| `wog/heartbeat` | Stale peer detection + recovery | Zones/quests freed automatically after 10s silence |
+
+Every log line with `CONSENSUS` is a direct observable effect of FoxMQ ordering:
+
+```
+[ragnar] CONSENSUS ZONE GRANT  seq=12: ragnar -> [Volcano]
+[lyria]  CONSENSUS ZONE REJECT seq=15: lyria conflicts with ragnar on [Volcano] => ragnar WINS (BFT order)
+[kira]   CONSENSUS PROPERTY SOLD seq=47: [Shadowgate Castle] -> kira @ 3600g (first valid offer wins)
+```
+
+Run:
+```bash
+python vertex-swarm/wog_swarm.py          # all 3 agents threaded
+python vertex-swarm/wog_swarm.py ragnar   # or one per terminal
+```
 
 ---
 
-## On-Chain Proof
+## On-Chain Layer (Stacks Testnet)
 
-All 11 property deeds are live on Stacks testnet:
+The FoxMQ coordination layer sits *above* a real blockchain settlement layer:
 
-| Property | Token ID | Mint Txid |
-|----------|----------|-----------|
-| Farmer's Cottage | 1 | `0x18132539...` |
-| Riverside Cabin | 2 | `0x73489231...` |
-| Miller's House | 3 | `0xcc59fdb8...` |
-| Aldric's Manor | 4 | `0x29f66571...` |
-| Ranger's Outpost | 5 | `0x5eee6f08...` |
-| Trapper's Lodge | 6 | `0xf9a0cd41...` |
-| Merchant Waystation | 7 | `0xc2d90855...` |
-| Elias Hunting Lodge | 8 | `0x2cf927e7...` |
-| Shadow Warden Keep | 9 | `0x68474cfa...` |
-| Necromancer Tower | 10 | `0x696b6b74...` |
-| Shadowgate Castle | 11 | `0xa67bfd29...` |
+- **11 SIP-009 NFT property deeds** minted live on Stacks testnet
+- Every property purchase calls `wog-property.clar` via `@stacks/transactions`
+- `wog-gold` (SIP-010) — in-game gold earned from combat and quests
+- On-chain state is the audit trail; FoxMQ is the coordination layer
 
-**Contract:** `ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E.wog-property`  
+**Contract:** `ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E.wog-property`
 **Explorer:** https://explorer.hiro.so/address/ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E.wog-property?chain=testnet
 
 ---
 
-## Agent Personalities (Leaderless Coordination in Practice)
+## The Live UI: Mesh Panel
 
-No central controller assigns roles. Each agent's behavior emerges from its personality weights:
+The game frontend includes a **Mesh** tab that shows the FoxMQ network in real time:
 
-| Agent | Class | Strategy |
-|-------|-------|---------|
-| Ragnar | Warrior | Aggressive combat; invests only when gold > 500; prefers cheap properties |
-| Lyria | Mage | Cautious; hoards gold to 1000+ before investing; targets high-tier properties |
-| Kira | Rogue | Opportunistic; monitors `wog/property/distress` first; seizes dying agents' portfolios |
+- One node card per connected agent (HP, gold, zone, properties, passive income)
+- Live consensus message feed with sequence numbers and topic color-coding
+- Online/Stale status per agent
+- Updates via WebSocket from the shard's FoxMQ bridge (`foxmqBridge.ts`)
 
-When Kira and Ragnar simultaneously attempt to buy the same distress property, **FoxMQ consensus picks the winner** — neither agent has privileged access. This is leaderless coordination in its purest form.
+Judges can watch the consensus ordering happen live in the browser without reading terminal logs.
 
----
-
-## aibtc.news Correspondent Integration
-
-The shard is registered as an aibtc.news correspondent on the **Agent Economy** beat. When the autonomous economy generates notable events (tier-4 acquisition, mass liquidation, passive income milestone), the shard automatically files a signal via BIP-137 signature.
-
-This closes the loop: the on-chain agent economy generates real financial news, filed by the system itself, without any human journalist.
+**Live game:** https://rogue-function.vercel.app/game.html → click **Mesh** tab
 
 ---
 
-## Live Demo
+## The Real Estate Economy
 
-- **Game:** https://rogue-function.vercel.app/game.html
-- **Estate Panel:** Click the Estate tab in the bottom nav — shows live portfolios and market listings
-- **Contract:** https://explorer.hiro.so/address/ST9NSDHK5969YF6WJ2MRCVVAVTDENWBNTFJRVZ3E.wog-property?chain=testnet
+Agents earn gold through combat, then invest in property deeds for passive income:
+
+```
+Combat gold → Buy SIP-009 property NFT → Earn passive gold every tick
+                          ↓
+              List for sale on wog/property/list
+                          ↓
+              Peers bid via wog/property/offer
+                          ↓
+              FoxMQ picks canonical first offer
+                          ↓
+              On death: distress broadcast at 60% price
+              First peer to respond seizes the portfolio
+```
+
+Tier 4 Shadowgate Castle generates 120g/tick. Every agent wants it. FoxMQ decides who gets it.
+
+---
+
+## Why No Central Orchestrator
+
+| Traditional approach | Our approach |
+|---------------------|-------------|
+| Central server holds zone map | Each agent maintains local state; FoxMQ ordering makes it consistent |
+| Server resolves bid conflicts | FoxMQ consensus sequence is the conflict resolution |
+| Single point of failure | BFT threshold: f < n/3 — 2 of 3 agents online = economy continues |
+| Coordinator can be corrupted | No coordinator exists to corrupt |
+
+When Kira crashes mid-auction, Ragnar and Lyria detect her stale heartbeat within 10 seconds and redistribute her zone and quest claims automatically. No restart. No human. No orchestrator.
+
+---
+
+## Agent Personalities (Emergent, Not Scripted)
+
+Each agent's behavior emerges from personality weights — no central script assigns roles:
+
+| Agent | Style | FoxMQ Behavior |
+|-------|-------|---------------|
+| Ragnar | Aggressive | Claims hardest zones first; bids on cheap properties |
+| Lyria | Cautious | Stockpiles gold before investing; targets premium tiers |
+| Kira | Opportunistic | Monitors `wog/property/distress`; seizes dying agents' portfolios |
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Coordination | Tashi FoxMQ (BFT MQTT 5.0, Vertex consensus) |
+| AI agents | Claude Haiku 4.5 / personality fallback (works offline) |
+| Blockchain | Stacks Clarity — SIP-009 `wog-property`, SIP-010 `wog-gold` |
+| Game server | Fastify + WebSocket (Node.js / TypeScript) |
+| FoxMQ bridge | `foxmqBridge.ts` → pushes mesh events to browser UI |
+| Frontend | Phaser 3 + Vite + live Mesh panel |
 
 ---
 
 ## Repo
-
 https://github.com/githoboman/rogue-function
 
----
-
 ## Team
-
-Solo submission — githoboman
-
----
+Solo — githoboman
 
 ## What's Next
-
-- Agent-to-agent direct STX payments via x402 for P2P property settlements (bypassing the shard)
-- Mainnet deployment with real STX at stake
-- Agent memory: properties accumulate history, affecting resale value
-- Human players competing with AI agents for the best real estate
+- Direct agent-to-agent STX micropayments via x402 (bypassing the shard entirely)
+- Mainnet deployment with real STX at stake in property auctions
+- Agent memory: property history affects resale value
+- Human players competing with AI agents for Tier 4 properties

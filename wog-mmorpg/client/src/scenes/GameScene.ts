@@ -1,9 +1,10 @@
 /**
  * GameScene.ts — Phaser 3 Main Game Scene
  * Uses Kenney character sprites with Graphics fallback.
- * Enhanced combat/death/respawn effects.
+ * Animations powered by anime.js v4 (physics-based easing, timelines).
  */
 import Phaser from "phaser";
+import { animate, createTimeline, idleBreathe, spawnBanner, spawnDmgNumber, spawnFloatLabel } from "../anime-utils";
 import type { GameWebSocket, PlayerState } from "../ws";
 
 // ── Visual Config ──────────────────────────────────────────
@@ -542,10 +543,8 @@ export class GameScene extends Phaser.Scene {
       if (this.hasCharSprites) {
         const npcSprite = this.add.image(0, -2, "chars", npc.charFrame).setScale(2);
         c.add(npcSprite);
-        // Gentle idle bob
-        this.tweens.add({
-          targets: npcSprite, y: -4, duration: 1500, yoyo: true, repeat: -1, ease: "Sine.easeInOut",
-        });
+        // Gentle idle bob via anime.js
+        idleBreathe(npcSprite, npcSprite.scaleX, npcSprite.scaleY);
       } else {
         const g = this.add.graphics();
         g.fillStyle(0x3366aa, 1);
@@ -564,9 +563,11 @@ export class GameScene extends Phaser.Scene {
       }).setOrigin(0.5);
       c.add(markerText);
 
-      this.tweens.add({
-        targets: markerText, y: -28, duration: 1000, yoyo: true, repeat: -1, ease: "Sine.easeInOut",
-      });
+      // Floating quest/shop marker bob
+      (function bobMarker() {
+        animate(markerText, { y: -28, duration: 1000, easing: "easeInOutSine",
+          onComplete: () => animate(markerText, { y: -24, duration: 1000, easing: "easeInOutSine", onComplete: bobMarker }) });
+      })();
 
       // Name plate
       c.add(this.add.text(0, 16, npc.name, {
@@ -594,44 +595,38 @@ export class GameScene extends Phaser.Scene {
       if (s) {
         const m = this.mobSprites.get(e.mobId);
         if (m) {
-          // Lunge toward mob then bounce back
           const origX = s.container.x;
           const origY = s.container.y;
           const dx = m.container.x - origX;
           const dy = m.container.y - origY;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          // Stop 18px away from mob center
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
           const lungeX = dist > 20 ? m.container.x - (dx / dist) * 18 : origX + dx * 0.5;
           const lungeY = dist > 20 ? m.container.y - (dy / dist) * 18 : origY + dy * 0.5;
 
-          this.tweens.add({
-            targets: s.container, x: lungeX, y: lungeY,
-            duration: 120, ease: "Power2",
+          // anime.js timeline: lunge → hit → recoil back
+          const tl = createTimeline();
+          tl.add(s.container, {
+            x: lungeX, y: lungeY,
+            duration: 110, easing: "easeInQuad",
             onComplete: () => {
-              // Slash + damage popup at mob position
               this.slashEffect(s.container.x, s.container.y, m.container.x, m.container.y);
               this.dmgPopup(m.container.x, m.container.y - 16, e.damage, e.crit);
-              // Mob recoil
-              const recoilX = m.container.x + (dx / dist) * 4;
-              const recoilY = m.container.y + (dy / dist) * 4;
-              this.tweens.add({ targets: m.container, x: recoilX, y: recoilY, duration: 60, yoyo: true });
-              // Flash mob red on hit
-              if (m.body) this.tweens.add({ targets: m.body, alpha: 0.4, duration: 60, yoyo: true });
-              // Bounce agent back
-              this.tweens.add({
-                targets: s.container, x: origX, y: origY,
-                duration: 200, ease: "Back.easeOut",
-              });
+              // mob recoil
+              const rx = m.container.x + (dx / dist) * 6;
+              const ry = m.container.y + (dy / dist) * 6;
+              animate(m.container, { x: [rx, m.container.x], duration: 160, easing: "easeOutBack" });
+              animate(m.body, { alpha: [0.3, 1], duration: 160, easing: "easeOutQuad" });
             },
           });
+          tl.add(s.container, {
+            x: origX, y: origY,
+            duration: 230, easing: "easeOutBack",
+          });
         } else {
-          // No mob found — just show popup at agent
           this.dmgPopup(s.container.x, s.container.y - 28, e.damage, e.crit);
         }
-        // Screen shake on crit
-        if (e.crit) this.cam.shake(150, 0.004);
-        // Flash agent on hit
-        this.tweens.add({ targets: s.container, alpha: 0.6, duration: 60, yoyo: true });
+        if (e.crit) this.cam.shake(140, 0.004);
+        animate(s.container, { alpha: [0.55, 1], duration: 120, easing: "easeOutQuad" });
       }
     });
 
@@ -641,13 +636,13 @@ export class GameScene extends Phaser.Scene {
         const mx = m.container.x, my = m.container.y;
         // Death burst particles
         this.deathBurst(mx, my, MOB_CONFIG[m.templateId]?.color || 0xaa5533);
-        // Shrink + fade
-        this.tweens.add({
-          targets: m.container, alpha: 0, scaleX: 0.2, scaleY: 0.2,
-          duration: 400, ease: "Back.easeIn",
+        // Shrink + fade via anime.js
+        animate(m.container, {
+          alpha: 0, scaleX: 0.2, scaleY: 0.2,
+          duration: 400, easing: "easeInBack",
           onComplete: () => { m.container.destroy(); this.mobSprites.delete(e.mobId); },
         });
-        this.floatText(mx, my, `+${e.xpGained}xp +${e.goldDropped}g`, "#88cc44");
+        spawnFloatLabel(mx, my, `+${e.xpGained}xp +${e.goldDropped}g`, "#88cc44");
       }
     });
 
@@ -664,7 +659,7 @@ export class GameScene extends Phaser.Scene {
     this.wsClient.on("zone_transition", (e: any) => {
       const s = this.agentSprites.get(e.playerId);
       if (s && e.fromZone === this.currentZone) {
-        this.tweens.add({ targets: s.container, alpha: 0, duration: 300 });
+        animate(s.container, { alpha: 0, duration: 300, easing: "easeOutQuad" });
       }
     });
   }
@@ -700,34 +695,11 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (moved) {
-      // Walking — bounce up/down while moving
-      if (!s.isMoving) {
-        s.isMoving = true;
-        s.idleTween?.pause();
-        s.walkTween?.remove();
-        s.walkTween = this.tweens.add({
-          targets: s.sprite || s.body,
-          y: (s.sprite ? -2 : 0) - 3,
-          duration: 100, yoyo: true, repeat: -1, ease: "Sine.easeInOut",
-        });
-      }
-
-      // Dust particles while walking
       this.spawnDust(s.container.x, s.container.y + 12);
-
-      this.tweens.add({
-        targets: s.container, x: tx, y: ty,
-        duration: 400, ease: "Sine.easeInOut",
-        onComplete: () => {
-          // Stop walk, resume idle
-          s!.isMoving = false;
-          s!.walkTween?.remove();
-          s!.walkTween = null;
-          const target = s!.sprite || s!.body;
-          // Reset to base y
-          target.y = s!.sprite ? -2 : 0;
-          s!.idleTween?.resume();
-        },
+      animate(s.container, {
+        x: tx, y: ty,
+        duration: 420,
+        easing: "easeOutCubic",
       });
     }
     s.x = tx; s.y = ty;
@@ -756,32 +728,19 @@ export class GameScene extends Phaser.Scene {
     if (s.currentAction === action) return;
     s.currentAction = action;
 
-    // Show icon with pop animation
+    // Show icon with pop animation via anime.js
     s.statusIcon.setText(icon);
     s.statusIcon.setAlpha(1);
     s.statusIcon.setScale(0.3);
-    this.tweens.add({
-      targets: s.statusIcon, scaleX: 1, scaleY: 1, duration: 200, ease: "Back.easeOut",
-    });
-    // Gentle float
-    this.tweens.add({
-      targets: s.statusIcon, y: -42, duration: 800, yoyo: true, repeat: 0, ease: "Sine.easeInOut",
-    });
-
+    animate(s.statusIcon, { scaleX: 1, scaleY: 1, duration: 200, easing: "easeOutBack" });
     // Fade out after 2s
-    this.time.delayedCall(2000, () => {
-      if (s.currentAction === action) {
-        this.tweens.add({ targets: s.statusIcon, alpha: 0, duration: 400 });
-      }
-    });
+    animate(s.statusIcon, { alpha: 0, duration: 400, delay: 2000, easing: "easeOutQuad" });
 
     // Show action text below agent
     if (target) {
       s.actionLabel.setText(`${action} ${target}`.slice(0, 28));
       s.actionLabel.setAlpha(1);
-      this.tweens.add({
-        targets: s.actionLabel, alpha: 0, duration: 400, delay: 2500,
-      });
+      animate(s.actionLabel, { alpha: 0, duration: 400, delay: 2500, easing: "easeOutQuad" });
     }
   }
 
@@ -795,11 +754,11 @@ export class GameScene extends Phaser.Scene {
         0xbbaa88, 0.4,
       ).setDepth(0);
       this.effectLayer.add(dust);
-      this.tweens.add({
-        targets: dust,
+      animate(dust, {
         y: y - Phaser.Math.Between(4, 10),
         alpha: 0, scaleX: 2, scaleY: 2,
         duration: Phaser.Math.Between(300, 500),
+        easing: "easeOutQuad",
         onComplete: () => dust.destroy(),
       });
     }
@@ -892,19 +851,14 @@ export class GameScene extends Phaser.Scene {
     c.add(hit);
     hit.on("pointerdown", () => this.cam.startFollow(c, true, 0.08, 0.08));
 
-    // Start idle breathing animation
-    const idleTween = this.tweens.add({
-      targets: sprite || body,
-      scaleY: sprite ? 1.55 : 1.04,
-      scaleX: sprite ? 1.48 : 0.97,
-      duration: 1200,
-      yoyo: true, repeat: -1, ease: "Sine.easeInOut",
-    });
+    // Start idle breathing animation via anime.js
+    const breathTarget = sprite || body;
+    idleBreathe(breathTarget, breathTarget.scaleX, breathTarget.scaleY);
 
     return {
       container: c, body, sprite, hpBar, nameLabel, levelLabel, actionLabel, statusIcon,
       cls, x: 100, y: 100, lastHp: 100, lastMaxHp: 100,
-      isMoving: false, idleTween, walkTween: null, currentAction: "",
+      isMoving: false, idleTween: null, walkTween: null, currentAction: "",
     };
   }
 
@@ -965,11 +919,8 @@ export class GameScene extends Phaser.Scene {
     }
     c.add(body);
 
-    // Idle breathing animation
-    this.tweens.add({
-      targets: body, scaleY: 1.06, duration: 800 + Phaser.Math.Between(0, 400),
-      yoyo: true, repeat: -1, ease: "Sine.easeInOut",
-    });
+    // Idle breathing via anime.js
+    idleBreathe(body, body.scaleX, 1.0);
 
     // HP bar
     const hpBar = this.add.graphics();
@@ -986,9 +937,9 @@ export class GameScene extends Phaser.Scene {
     this.entityLayer.add(c);
     this.mobSprites.set(mobId, { container: c, body, hpBar, nameLabel, templateId: tid });
 
-    // Fade in
+    // Fade in via anime.js
     c.setAlpha(0);
-    this.tweens.add({ targets: c, alpha: 1, duration: 400, ease: "Power2" });
+    animate(c, { alpha: 1, duration: 400, easing: "easeOutQuad" });
   }
 
   // ── HP Bar ─────────────────────────────────────────────
@@ -1014,25 +965,8 @@ export class GameScene extends Phaser.Scene {
   // ── Effects ────────────────────────────────────────────
 
   private dmgPopup(x: number, y: number, dmg: number, crit: boolean) {
-    const offsetX = Phaser.Math.Between(-12, 12);
-    const t = this.add.text(x + offsetX, y, crit ? `${dmg}!` : `-${dmg}`, {
-      fontSize: crit ? "18px" : "13px", color: crit ? "#ffdd22" : "#ff4444",
-      fontFamily: "Arial", fontStyle: "bold", stroke: "#000000", strokeThickness: crit ? 4 : 3,
-    }).setOrigin(0.5).setDepth(11);
-    this.effectLayer.add(t);
-
-    // Crit numbers bounce up higher and scale
-    if (crit) {
-      this.tweens.add({
-        targets: t, y: y - 50, alpha: 0, scaleX: 1.3, scaleY: 1.3,
-        duration: 1100, ease: "Power2", onComplete: () => t.destroy(),
-      });
-    } else {
-      this.tweens.add({
-        targets: t, y: y - 30, alpha: 0, duration: 800, ease: "Power2",
-        onComplete: () => t.destroy(),
-      });
-    }
+    // Use DOM overlay for damage numbers (anime.js spawnDmgNumber)
+    spawnDmgNumber(x, y, dmg, crit);
   }
 
   private slashEffect(fromX: number, fromY: number, toX: number, toY: number) {
@@ -1075,7 +1009,7 @@ export class GameScene extends Phaser.Scene {
     // Impact flash circle
     const flash = this.add.circle(hitX, hitY, 6, 0xffffff, 0.5).setDepth(11);
     this.effectLayer.add(flash);
-    this.tweens.add({ targets: flash, scaleX: 2, scaleY: 2, alpha: 0, duration: 180, onComplete: () => flash.destroy() });
+    animate(flash, { scaleX: 2, scaleY: 2, alpha: 0, duration: 180, easing: "easeOutQuad", onComplete: () => flash.destroy() });
 
     // Small spark particles
     for (let i = 0; i < 4; i++) {
@@ -1083,21 +1017,20 @@ export class GameScene extends Phaser.Scene {
       const sparkDist = Phaser.Math.Between(8, 16);
       const spark = this.add.circle(hitX, hitY, 1.5, 0xffdd44, 0.8).setDepth(11);
       this.effectLayer.add(spark);
-      this.tweens.add({
-        targets: spark,
+      animate(spark, {
         x: hitX + Math.cos(sparkAngle) * sparkDist,
         y: hitY + Math.sin(sparkAngle) * sparkDist,
         alpha: 0, duration: Phaser.Math.Between(150, 300),
+        easing: "easeOutQuad",
         onComplete: () => spark.destroy(),
       });
     }
 
     this.effectLayer.add(g);
-    this.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() });
+    animate(g, { alpha: 0, duration: 200, easing: "easeOutQuad", onComplete: () => g.destroy() });
   }
 
   private deathBurst(x: number, y: number, color: number) {
-    // Burst of particles
     const numParticles = 8;
     for (let i = 0; i < numParticles; i++) {
       const angle = (Math.PI * 2 / numParticles) * i + Math.random() * 0.5;
@@ -1105,63 +1038,50 @@ export class GameScene extends Phaser.Scene {
       const size = Phaser.Math.Between(1, 3);
       const p = this.add.circle(x, y, size, color, 0.8).setDepth(11);
       this.effectLayer.add(p);
-      this.tweens.add({
-        targets: p,
+      animate(p, {
         x: x + Math.cos(angle) * speed,
         y: y + Math.sin(angle) * speed,
         alpha: 0, scaleX: 0.2, scaleY: 0.2,
-        duration: Phaser.Math.Between(300, 600), ease: "Power2",
+        duration: Phaser.Math.Between(300, 600), easing: "easeOutQuad",
         onComplete: () => p.destroy(),
       });
     }
 
-    // Flash circle
     const flash = this.add.circle(x, y, 12, 0xffffff, 0.4).setDepth(11);
     this.effectLayer.add(flash);
-    this.tweens.add({
-      targets: flash, scaleX: 2.5, scaleY: 2.5, alpha: 0,
-      duration: 300, ease: "Power2", onComplete: () => flash.destroy(),
-    });
+    animate(flash, { scaleX: 2.5, scaleY: 2.5, alpha: 0, duration: 300, easing: "easeOutQuad", onComplete: () => flash.destroy() });
   }
 
   private playerDeathFx(s: AgentSprite) {
     const x = s.container.x;
     const y = s.container.y;
 
-    // Flash red
-    this.tweens.add({
-      targets: s.container, alpha: 0.15, duration: 150, yoyo: true, repeat: 5,
-    });
+    // Flash red via anime.js — 6 rapid flicker cycles
+    const flashSeq = (n: number) => {
+      if (n <= 0) return;
+      animate(s.container, { alpha: 0.15, duration: 150, easing: "easeOutQuad",
+        onComplete: () => animate(s.container, { alpha: 1, duration: 150, easing: "easeOutQuad", onComplete: () => flashSeq(n - 1) }) });
+    };
+    flashSeq(5);
 
-    // Camera red flash
+    // Camera red flash (Phaser native — keeps this one)
     this.cam.flash(300, 80, 0, 0, true);
 
-    // Skull icon floating up
+    // Skull floating up
     const skull = this.add.text(x, y - 10, "\u2620", {
-      fontSize: "20px", color: "#ff4444",
-      stroke: "#000000", strokeThickness: 3,
+      fontSize: "20px", color: "#ff4444", stroke: "#000000", strokeThickness: 3,
     }).setOrigin(0.5).setDepth(12);
     this.effectLayer.add(skull);
-    this.tweens.add({
-      targets: skull, y: y - 50, alpha: 0, scaleX: 1.5, scaleY: 1.5,
-      duration: 1500, ease: "Power2", onComplete: () => skull.destroy(),
-    });
+    animate(skull, { y: y - 50, alpha: 0, scaleX: 1.5, scaleY: 1.5, duration: 1500, easing: "easeOutCubic", onComplete: () => skull.destroy() });
 
-    // Ground blood splatter
+    // Ground splat
     const splat = this.add.circle(x, y + 8, 6, 0x881111, 0.3).setDepth(0);
     this.effectLayer.add(splat);
-    this.tweens.add({
-      targets: splat, scaleX: 2, scaleY: 1.5, alpha: 0,
-      duration: 3000, onComplete: () => splat.destroy(),
-    });
+    animate(splat, { scaleX: 2, scaleY: 1.5, alpha: 0, duration: 3000, easing: "easeOutQuad", onComplete: () => splat.destroy() });
   }
 
   private floatText(x: number, y: number, text: string, color: string) {
-    const t = this.add.text(x, y - 10, text, {
-      fontSize: "10px", color, fontFamily: "Arial", fontStyle: "bold", stroke: "#000000", strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(11);
-    this.effectLayer.add(t);
-    this.tweens.add({ targets: t, y: y - 44, alpha: 0, duration: 1400, onComplete: () => t.destroy() });
+    spawnFloatLabel(x, y - 10, text, color);
   }
 
   private levelUpFx(x: number, y: number) {

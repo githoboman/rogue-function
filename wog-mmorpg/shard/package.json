@@ -26,6 +26,7 @@
     "@stacks/transactions": "^6.13.0",
     "@stacks/wallet-sdk": "^7.2.0",
     "fastify": "^5.8.2",
+    "mqtt": "^5.15.1",
     "x402-stacks": "^2.0.1"
   },
   "devDependencies": {

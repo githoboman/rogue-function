@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "animejs": "^4.3.6",
     "phaser": "^3.60.0"
   },
   "devDependencies": {

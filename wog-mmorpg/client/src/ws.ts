@@ -80,6 +80,14 @@ export class GameWebSocket {
           return;
         }
 
+        // FoxMQ mesh events — forward to game.html handler
+        if (event.type === "foxmq_status" || event.type === "foxmq_message" || event.type === "foxmq_mesh") {
+          if (typeof (window as any).__onFoxmqEvent === "function") {
+            (window as any).__onFoxmqEvent(event.type, event.data);
+          }
+          return;
+        }
+
         this.handlers.forEach(h => h(event));
       } catch (e) {
         console.warn("Failed to parse WS message", e);

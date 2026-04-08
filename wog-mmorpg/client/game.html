@@ -387,6 +387,33 @@
           <div id="estate-listings-list"></div>
         </div>
       </div>
+      <!-- ── Mesh Panel (FoxMQ P2P Network View) ── -->
+      <div id="panel-mesh" class="panel-view" style="display:none">
+        <div style="padding:12px 16px;border-bottom:1px solid rgba(100,160,255,0.08)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#4a7aaa">Tashi FoxMQ Consensus Mesh</span>
+            <span id="mesh-status" style="font-size:9px;padding:2px 10px;border-radius:10px;background:rgba(244,67,54,0.1);color:#f44336;border:1px solid rgba(244,67,54,0.2)">OFFLINE</span>
+          </div>
+          <div style="display:flex;gap:16px;font-size:10px;color:#4a4a5a">
+            <span>Agents online: <b id="mesh-agent-count" style="color:#64a0ff">0</b></span>
+            <span>Messages: <b id="mesh-msg-count" style="color:#6ad0a0">0</b></span>
+            <span style="font-size:9px;color:#2a2a4a">BFT threshold: f &lt; n/3 &nbsp;|&nbsp; consensus-ordered delivery</span>
+          </div>
+        </div>
+
+        <!-- Agent node cards -->
+        <div style="padding:8px 12px">
+          <div style="font-size:9px;color:#2a3a5a;padding:6px 0 4px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700">Peer Nodes</div>
+          <div id="mesh-agents-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px"></div>
+        </div>
+
+        <!-- Live message feed -->
+        <div style="padding:0 12px 8px">
+          <div style="font-size:9px;color:#2a3a5a;padding:8px 0 4px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700">Consensus Message Feed</div>
+          <div id="mesh-feed" style="font-family:'Courier New',monospace;font-size:9px;max-height:180px;overflow-y:auto;background:rgba(4,8,16,0.8);border:1px solid rgba(100,160,255,0.06);border-radius:8px;padding:6px 8px"></div>
+        </div>
+      </div>
+
       <div id="panel-join" class="panel-view" style="display:none">
         <div id="join-section">
           <form id="join-form">
@@ -440,6 +467,11 @@
       <span class="nav-tab-label">Estate</span>
       <span class="nav-badge" id="estate-income-badge">0g</span>
     </div>
+    <div class="nav-tab" data-panel="mesh" onclick="switchTab(this)">
+      <span class="nav-tab-icon">&#128301;</span>
+      <span class="nav-tab-label">Mesh</span>
+      <span class="nav-badge" id="mesh-online-badge" style="background:rgba(100,160,255,0.15);color:#64a0ff;border-color:rgba(100,160,255,0.2)">0</span>
+    </div>
     <div class="nav-tab" data-panel="join" onclick="switchTab(this)">
       <span class="nav-tab-icon">&#9876;&#65039;</span>
       <span class="nav-tab-label">Join</span>
@@ -473,9 +505,10 @@
       if (target) target.style.display = 'block';
 
       // Set title
-      const titles = { agents: 'Agents', earnings: 'Agent Earnings', leaderboard: 'Leaderboard', log: 'Event Log', join: 'Join Game', estate: 'Property Estate' };
+      const titles = { agents: 'Agents', earnings: 'Agent Earnings', leaderboard: 'Leaderboard', log: 'Event Log', join: 'Join Game', estate: 'Property Estate', mesh: 'FoxMQ Consensus Mesh' };
       if (title) title.textContent = titles[panel] || panel;
       if (panel === 'estate') loadEstatePanel();
+      if (panel === 'mesh') loadMeshPanel();
 
       overlay.classList.add('open');
       currentPanel = panel;
@@ -600,6 +633,116 @@
       if (data.aiPaused) { btn.className = 'paused'; btn.textContent = 'AI: PAUSED'; }
       else { btn.className = 'active'; btn.textContent = 'AI: ON'; }
     }).catch(() => {});
+
+    // ── Mesh Panel (FoxMQ live network view) ─────────────────
+    const TOPIC_COLORS = {
+      zone: '#eebb44', quest: '#6aaa6a', heal: '#ee4444',
+      loot: '#aa66ee', property: '#44aaee', heartbeat: '#2a3a5a', state: '#4a7aaa',
+    };
+    let meshMsgCount = 0;
+
+    async function loadMeshPanel() {
+      try {
+        const snap = await fetch(getShardURL() + '/foxmq/snapshot').then(r => r.json());
+        renderMeshPanel(snap);
+      } catch(e) {
+        document.getElementById('mesh-agents-grid').innerHTML =
+          '<div style="padding:10px;font-size:10px;color:#2a2a4a">Start FoxMQ + wog_swarm.py to see live mesh data</div>';
+      }
+    }
+
+    function renderMeshPanel(snap) {
+      // Status pill
+      const statusEl = document.getElementById('mesh-status');
+      const online = snap.connected || 0;
+      statusEl.textContent = online > 0 ? 'ONLINE' : 'WAITING';
+      statusEl.style.background = online > 0 ? 'rgba(76,175,80,0.1)' : 'rgba(255,152,0,0.1)';
+      statusEl.style.color = online > 0 ? '#4caf50' : '#ff9800';
+      statusEl.style.borderColor = online > 0 ? 'rgba(76,175,80,0.2)' : 'rgba(255,152,0,0.2)';
+      document.getElementById('mesh-agent-count').textContent = online;
+      document.getElementById('mesh-online-badge').textContent = online;
+
+      // Agent node cards
+      const grid = document.getElementById('mesh-agents-grid');
+      const agents = snap.agents || [];
+      grid.innerHTML = agents.length ? agents.map(a => {
+        const hpPct = Math.round((a.hp / (a.maxHp || 100)) * 100);
+        const statusColor = a.status === 'active' ? '#4caf50' : '#f44336';
+        const classColors = { Warrior:'#dd6644', Mage:'#7766ee', Ranger:'#55bb55', Rogue:'#cc5588' };
+        const cc = classColors[a.cls] || '#8888aa';
+        return `
+          <div style="padding:10px 12px;border-radius:10px;border:1px solid rgba(100,160,255,0.08);background:rgba(6,10,20,0.9)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="font-size:10px;font-weight:700;color:${cc}">${a.name}</span>
+              <span style="font-size:8px;padding:1px 6px;border-radius:6px;background:${statusColor}22;color:${statusColor}">${a.status.toUpperCase()}</span>
+            </div>
+            <div style="font-size:9px;color:#4a4a6a;margin-bottom:5px">${a.cls} · Lv${a.level} · ${a.zone || 'no zone'}</div>
+            <div style="background:rgba(255,255,255,0.04);height:3px;border-radius:2px;margin-bottom:5px">
+              <div style="background:linear-gradient(90deg,#2d8c3e,#4caf50);height:3px;border-radius:2px;width:${hpPct}%"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;color:#4a4a5a">
+              <span style="color:#c8a84b">${a.gold}g</span>
+              <span style="color:#64a0ff">${a.properties.length} props</span>
+              <span style="color:#6ad0a0">+${a.passiveIncome}g/tick</span>
+            </div>
+          </div>`;
+      }).join('') : '<div style="padding:10px;font-size:10px;color:#2a2a4a;grid-column:1/-1">No agents on mesh — run: python vertex-swarm/wog_swarm.py</div>';
+
+      // Message feed
+      const msgs = snap.recentMessages || [];
+      document.getElementById('mesh-msg-count').textContent = meshMsgCount || msgs.length;
+      const feed = document.getElementById('mesh-feed');
+      feed.innerHTML = msgs.map(m => {
+        const col = TOPIC_COLORS[m.type] || '#4a4a6a';
+        const time = new Date(m.ts).toLocaleTimeString('en', { hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+        return `<div style="padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.02)">
+          <span style="color:#2a3a5a">${time}</span>
+          <span style="color:#3a4a7a;margin:0 4px">#${m.seq}</span>
+          <span style="color:${col}">[${m.topic}]</span>
+          <span style="color:#5a5a6a;margin-left:4px">${m.summary}</span>
+        </div>`;
+      }).join('') || '<span style="color:#2a2a4a">Waiting for FoxMQ messages...</span>';
+    }
+
+    // Handle FoxMQ events pushed via WebSocket
+    window.__onFoxmqEvent = function(type, data) {
+      if (type === 'foxmq_status') {
+        const statusEl = document.getElementById('mesh-status');
+        if (statusEl) {
+          statusEl.textContent = data.connected ? 'ONLINE' : 'OFFLINE';
+          statusEl.style.color = data.connected ? '#4caf50' : '#f44336';
+        }
+      }
+      if (type === 'foxmq_message') {
+        meshMsgCount++;
+        document.getElementById('mesh-msg-count') && (document.getElementById('mesh-msg-count').textContent = meshMsgCount);
+        // Prepend to feed if mesh panel is open
+        if (currentPanel === 'mesh') {
+          const feed = document.getElementById('mesh-feed');
+          if (feed) {
+            const m = data;
+            const col = TOPIC_COLORS[m.type] || '#4a4a6a';
+            const time = new Date(m.ts).toLocaleTimeString('en', { hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+            const row = document.createElement('div');
+            row.style.cssText = 'padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.02)';
+            row.innerHTML = `<span style="color:#2a3a5a">${time}</span><span style="color:#3a4a7a;margin:0 4px">#${m.seq}</span><span style="color:${col}">[${m.topic}]</span><span style="color:#5a5a6a;margin-left:4px">${m.summary}</span>`;
+            feed.insertBefore(row, feed.firstChild);
+            // Trim to 30 rows
+            while (feed.children.length > 30) feed.removeChild(feed.lastChild);
+          }
+        }
+      }
+      if (type === 'foxmq_mesh') {
+        // Update agent count badge
+        const online = (data.agents || []).filter(a => a.status !== 'stale').length;
+        const badge = document.getElementById('mesh-online-badge');
+        if (badge) badge.textContent = online;
+        if (currentPanel === 'mesh') loadMeshPanel();
+      }
+    };
+
+    // Refresh mesh panel every 5s when visible
+    setInterval(() => { if (currentPanel === 'mesh') loadMeshPanel(); }, 5000);
   </script>
   <script type="module" src="/src/main.ts"></script>
 </body>
