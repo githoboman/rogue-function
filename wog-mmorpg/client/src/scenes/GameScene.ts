@@ -9,15 +9,15 @@ import type { GameWebSocket, PlayerState } from "../ws";
 
 // ── Visual Config ──────────────────────────────────────────
 
-const CLASS_CONFIG: Record<string, { color: number; accent: number; icon: string; glow: number; charFrame: number }> = {
-  Warrior:     { color: 0xdd6644, accent: 0xaa4422, icon: "\u2694", glow: 0xff6633, charFrame: 0 },
-  Mage:        { color: 0x7766ee, accent: 0x5544bb, icon: "\u2726", glow: 0x9988ff, charFrame: 109 },
-  Ranger:      { color: 0x55bb55, accent: 0x338833, icon: "\u2192", glow: 0x66dd66, charFrame: 54 },
-  Cleric:      { color: 0xeebb33, accent: 0xbb8822, icon: "\u271A", glow: 0xffdd44, charFrame: 163 },
-  Rogue:       { color: 0xcc5588, accent: 0x993366, icon: "\u2020", glow: 0xee77aa, charFrame: 216 },
-  Paladin:     { color: 0x4499ee, accent: 0x2266bb, icon: "\u2666", glow: 0x55aaff, charFrame: 2 },
-  Necromancer: { color: 0x9944cc, accent: 0x6622aa, icon: "\u2620", glow: 0xbb66ee, charFrame: 111 },
-  Druid:       { color: 0x44bb99, accent: 0x228866, icon: "\u2618", glow: 0x55ddbb, charFrame: 55 },
+const CLASS_CONFIG: Record<string, { color: number; accent: number; icon: string; glow: number; charFrame: number; ringColor: number }> = {
+  Warrior:     { color: 0xdd6644, accent: 0xaa3322, icon: "\u2694", glow: 0xff6633, charFrame: 0,   ringColor: 0xff4422 },
+  Mage:        { color: 0x8877ff, accent: 0x5544cc, icon: "\u2726", glow: 0xaa99ff, charFrame: 109, ringColor: 0x9977ff },
+  Ranger:      { color: 0x55cc55, accent: 0x338833, icon: "\u2192", glow: 0x77ee77, charFrame: 54,  ringColor: 0x44cc44 },
+  Cleric:      { color: 0xffcc33, accent: 0xcc9922, icon: "\u271A", glow: 0xffee66, charFrame: 163, ringColor: 0xeecc44 },
+  Rogue:       { color: 0xee55aa, accent: 0xbb2277, icon: "\u2020", glow: 0xff77cc, charFrame: 216, ringColor: 0xdd44aa },
+  Paladin:     { color: 0x44aaff, accent: 0x2277cc, icon: "\u2666", glow: 0x66ccff, charFrame: 2,   ringColor: 0x3399ff },
+  Necromancer: { color: 0xbb44ee, accent: 0x7722bb, icon: "\u2620", glow: 0xdd66ff, charFrame: 111, ringColor: 0xaa33dd },
+  Druid:       { color: 0x44ddaa, accent: 0x228866, icon: "\u2618", glow: 0x66ffcc, charFrame: 55,  ringColor: 0x33ccaa },
 };
 
 const MOB_CONFIG: Record<string, { color: number; size: number; shape: string }> = {
@@ -87,12 +87,11 @@ interface AgentSprite {
   levelLabel: Phaser.GameObjects.Text;
   actionLabel: Phaser.GameObjects.Text;
   statusIcon: Phaser.GameObjects.Text;
+  glowRing: Phaser.GameObjects.Arc;
   cls: string;
   x: number; y: number;
   lastHp: number; lastMaxHp: number;
   isMoving: boolean;
-  idleTween: Phaser.Tweens.Tween | null;
-  walkTween: Phaser.Tweens.Tween | null;
   currentAction: string;
 }
 
@@ -150,15 +149,19 @@ export class GameScene extends Phaser.Scene {
     this.drawGround();
     this.drawProps();
     this.drawNPCs();
+    this.spawnAmbientParticles();
 
-    // Zone label — very subtle
+    // Zone label — styled pill
     const zoneNames: Record<string, string> = {
-      human_meadow: "Human Meadow", wild_meadow: "Wild Meadow", dark_forest: "Dark Forest",
+      human_meadow: "🌿 Human Meadow", wild_meadow: "🌲 Wild Meadow", dark_forest: "🌑 Dark Forest",
     };
-    this.add.text(this.W / 2, 20, zoneNames[this.currentZone] || "", {
-      fontSize: "14px", color: "#ffffff", fontFamily: "'Segoe UI', Arial, sans-serif",
-      fontStyle: "bold", stroke: "#000000", strokeThickness: 3,
-    }).setOrigin(0.5, 0).setDepth(100).setAlpha(0.25);
+    const zoneLabel = this.add.text(this.W / 2, 14, zoneNames[this.currentZone] || "", {
+      fontSize: "11px", color: "#c8a84b", fontFamily: "'Segoe UI', Arial, sans-serif",
+      fontStyle: "bold", padding: { x: 12, y: 5 },
+    }).setOrigin(0.5, 0).setDepth(100).setAlpha(0.7);
+    // Subtle fade in
+    zoneLabel.setAlpha(0);
+    animate(zoneLabel, { alpha: 0.7, duration: 800, delay: 200, easing: "easeOutCubic" });
 
     // Pan
     this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
@@ -522,6 +525,62 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // ── Ambient Particles ──────────────────────────────────
+
+  private spawnAmbientParticles() {
+    const isDark = this.currentZone === "dark_forest";
+    const isWild = this.currentZone === "wild_meadow";
+
+    // Floating fireflies/motes
+    const numMotes = isDark ? 18 : isWild ? 10 : 6;
+    const moteColor = isDark ? 0x9944ff : isWild ? 0x66ff88 : 0xffee88;
+
+    for (let i = 0; i < numMotes; i++) {
+      const mx = Phaser.Math.Between(30, this.W - 30);
+      const my = Phaser.Math.Between(30, this.H - 80);
+      const sz = Phaser.Math.FloatBetween(1, 2.5);
+      const mote = this.add.circle(mx, my, sz, moteColor, 0.7).setDepth(5);
+      this.effectLayer.add(mote);
+
+      // Each mote floats independently
+      const floatMote = () => {
+        const nx = mx + Phaser.Math.Between(-40, 40);
+        const ny = my + Phaser.Math.Between(-30, 30);
+        const dur = Phaser.Math.Between(2000, 5000);
+        animate(mote, {
+          x: nx, y: ny,
+          alpha: [{ to: 0.8 }, { to: 0.1 }, { to: 0.7 }],
+          duration: dur,
+          easing: "easeInOutSine",
+          onComplete: floatMote,
+        });
+      };
+      // Stagger start
+      setTimeout(floatMote, Phaser.Math.Between(0, 3000));
+    }
+
+    // Dark forest: eerie fog wisps
+    if (isDark) {
+      for (let i = 0; i < 5; i++) {
+        const fx = Phaser.Math.Between(0, this.W);
+        const fy = Phaser.Math.Between(this.H * 0.4, this.H - 40);
+        const wisp = this.add.ellipse(fx, fy, Phaser.Math.Between(60, 140), Phaser.Math.Between(14, 28), 0x334466, 0.06).setDepth(3);
+        this.effectLayer.add(wisp);
+
+        const driftWisp = () => {
+          animate(wisp, {
+            x: fx + Phaser.Math.Between(-80, 80),
+            alpha: [{ to: 0.08 }, { to: 0.02 }, { to: 0.06 }],
+            duration: Phaser.Math.Between(4000, 8000),
+            easing: "easeInOutSine",
+            onComplete: driftWisp,
+          });
+        };
+        setTimeout(driftWisp, Phaser.Math.Between(0, 4000));
+      }
+    }
+  }
+
   // ── NPCs ───────────────────────────────────────────────
 
   private drawNPCs() {
@@ -625,8 +684,14 @@ export class GameScene extends Phaser.Scene {
         } else {
           this.dmgPopup(s.container.x, s.container.y - 28, e.damage, e.crit);
         }
-        if (e.crit) this.cam.shake(140, 0.004);
-        animate(s.container, { alpha: [0.55, 1], duration: 120, easing: "easeOutQuad" });
+        if (e.crit) this.cam.shake(160, 0.006);
+        // Flash agent alpha
+        animate(s.container, { alpha: [0.5, 1], duration: 140, easing: "easeOutQuad" });
+        // Glow ring combat burst
+        if (s.glowRing) {
+          animate(s.glowRing, { alpha: e.crit ? 0.5 : 0.25, duration: 80, easing: "easeOutQuad",
+            onComplete: () => animate(s.glowRing, { alpha: 0, duration: 200, easing: "easeOutQuad" }) });
+        }
       }
     });
 
@@ -768,97 +833,138 @@ export class GameScene extends Phaser.Scene {
     const cfg = CLASS_CONFIG[cls] || CLASS_CONFIG.Warrior;
     const c = this.add.container(100, 100);
 
-    // Ground shadow
-    c.add(this.add.ellipse(0, 14, 18, 6, 0x000000, 0.3));
+    // ── Outer glow ring (pulsing halo) ──────────────────────
+    const glowRing = this.add.circle(0, 0, 22, cfg.ringColor, 0.0);
+    c.add(glowRing);
 
-    // Class glow (subtle halo)
-    c.add(this.add.circle(0, 0, 16, cfg.glow, 0.06));
+    // ── Ground shadow (elongated ellipse) ───────────────────
+    c.add(this.add.ellipse(0, 16, 22, 7, 0x000000, 0.35));
 
-    // Try to use sprite, fallback to graphics
+    // ── Class ambient glow disc ─────────────────────────────
+    c.add(this.add.circle(0, 0, 18, cfg.glow, 0.10));
+
+    // ── Sprite or graphic body ──────────────────────────────
     let sprite: Phaser.GameObjects.Image | null = null;
     const body = this.add.graphics();
 
     if (this.hasCharSprites) {
       try {
-        sprite = this.add.image(0, -2, "chars", cfg.charFrame).setScale(1.5);
-        // Tint with class color for variety
+        sprite = this.add.image(0, -4, "chars", cfg.charFrame).setScale(2.0);
         sprite.setTint(cfg.color);
         c.add(sprite);
-      } catch {
-        sprite = null;
-      }
+      } catch { sprite = null; }
     }
 
     if (!sprite) {
-      // Fallback: draw character with graphics
+      // High-quality graphic fallback — multi-layer character
+      // Legs
       body.fillStyle(cfg.accent, 1);
-      body.fillRect(-4, 4, 3, 8);
-      body.fillRect(1, 4, 3, 8);
-      body.fillStyle(cfg.color, 1);
-      body.fillRoundedRect(-7, -6, 14, 12, 2);
-      body.fillStyle(0xffffff, 0.12);
-      body.fillRoundedRect(-6, -5, 12, 4, 1);
-      body.fillStyle(0xeeddcc, 1);
-      body.fillCircle(0, -10, 5);
-      body.fillStyle(0x222222, 1);
-      body.fillCircle(-2, -11, 1);
-      body.fillCircle(2, -11, 1);
-      body.fillStyle(cfg.color, 0.7);
-      body.fillRect(-4, -15, 8, 3);
-      c.add(body);
+      body.fillRoundedRect(-5, 5, 4, 10, 2);
+      body.fillRoundedRect(1, 5, 4, 10, 2);
 
-      // Class icon on chest
-      c.add(this.add.text(0, -1, cfg.icon, {
-        fontSize: "8px", color: hexStr(cfg.glow), fontFamily: "Arial",
-      }).setOrigin(0.5).setAlpha(0.9));
+      // Body armor plate
+      body.fillStyle(cfg.color, 1);
+      body.fillRoundedRect(-8, -8, 16, 14, 3);
+      // Armor highlight
+      body.fillStyle(0xffffff, 0.18);
+      body.fillRoundedRect(-7, -7, 14, 5, 2);
+      // Armor shadow
+      body.fillStyle(cfg.accent, 0.4);
+      body.fillRoundedRect(-7, 2, 14, 4, 2);
+
+      // Shoulder pads
+      body.fillStyle(cfg.accent, 1);
+      body.fillCircle(-9, -4, 3);
+      body.fillCircle(9, -4, 3);
+      body.fillStyle(cfg.color, 0.6);
+      body.fillCircle(-9, -5, 2);
+      body.fillCircle(9, -5, 2);
+
+      // Head
+      body.fillStyle(0xf0ddcc, 1);
+      body.fillCircle(0, -14, 6);
+      // Eyes
+      body.fillStyle(0x1a1a2a, 1);
+      body.fillCircle(-2, -15, 1.2);
+      body.fillCircle(2, -15, 1.2);
+      // Eye glow for class
+      body.fillStyle(cfg.glow, 0.8);
+      body.fillCircle(-2, -15, 0.6);
+      body.fillCircle(2, -15, 0.6);
+
+      // Helmet/hair
+      body.fillStyle(cfg.accent, 1);
+      body.fillRoundedRect(-5, -20, 10, 7, 2);
+      body.fillStyle(cfg.color, 0.5);
+      body.fillRect(-4, -19, 8, 2);
+
+      // Class icon badge on chest
+      c.add(this.add.text(0, -2, cfg.icon, {
+        fontSize: "9px", color: hexStr(cfg.glow), fontFamily: "Arial",
+      }).setOrigin(0.5).setAlpha(0.95));
+
+      c.add(body);
     }
 
-    // HP bar
+    // ── HP bar (wider, cleaner) ──────────────────────────────
     const hpBar = this.add.graphics();
     c.add(hpBar);
-    this.drawHpBar(hpBar, 100, 100, 28, -20);
+    this.drawHpBar(hpBar, 100, 100, 32, -24);
 
-    // Name
-    const nameLabel = this.add.text(0, -28, name, {
-      fontSize: "9px", color: "#ffffff", fontFamily: "'Segoe UI', Arial, sans-serif",
-      fontStyle: "bold", stroke: "#000000", strokeThickness: 4,
+    // ── Name plate with class color accent ──────────────────
+    const nameBg = this.add.graphics();
+    nameBg.fillStyle(0x000000, 0.55);
+    nameBg.fillRoundedRect(-name.length * 3.5 - 4, -35, name.length * 7 + 8, 11, 3);
+    c.add(nameBg);
+
+    const nameLabel = this.add.text(0, -30, name, {
+      fontSize: "10px", color: hexStr(cfg.glow), fontFamily: "'Segoe UI', Arial, sans-serif",
+      fontStyle: "bold",
     }).setOrigin(0.5, 1);
     c.add(nameLabel);
 
-    // Level badge
-    const levelLabel = this.add.text(18, -20, "Lv1", {
-      fontSize: "7px", color: "#ddaa33", fontFamily: "Arial",
+    // ── Level badge ─────────────────────────────────────────
+    const levelLabel = this.add.text(20, -23, "Lv1", {
+      fontSize: "8px", color: "#ffdd44", fontFamily: "Arial",
       stroke: "#000000", strokeThickness: 2,
     }).setOrigin(0, 0.5);
     c.add(levelLabel);
 
-    // Action text
-    const actionLabel = this.add.text(0, 22, "", {
-      fontSize: "7px", color: "#556677", fontFamily: "Arial",
+    // ── Action text ─────────────────────────────────────────
+    const actionLabel = this.add.text(0, 24, "", {
+      fontSize: "8px", color: "#5a7a8a", fontFamily: "Arial",
       stroke: "#000000", strokeThickness: 2,
     }).setOrigin(0.5, 0);
     c.add(actionLabel);
 
-    // Status icon (shows what agent is doing — sword, scroll, boot, zzz)
-    const statusIcon = this.add.text(0, -38, "", {
-      fontSize: "14px", color: "#ffffff", fontFamily: "Arial",
+    // ── Status icon ─────────────────────────────────────────
+    const statusIcon = this.add.text(0, -44, "", {
+      fontSize: "16px", color: "#ffffff", fontFamily: "Arial",
       stroke: "#000000", strokeThickness: 3,
     }).setOrigin(0.5, 1).setAlpha(0);
     c.add(statusIcon);
 
-    // Click to follow
-    const hit = this.add.rectangle(0, 0, 28, 36, 0xffffff, 0).setInteractive();
+    // ── Click to follow ─────────────────────────────────────
+    const hit = this.add.rectangle(0, 0, 32, 42, 0xffffff, 0).setInteractive();
     c.add(hit);
     hit.on("pointerdown", () => this.cam.startFollow(c, true, 0.08, 0.08));
+    hit.on("pointerover", () => { glowRing.setAlpha(0.15); });
+    hit.on("pointerout",  () => { glowRing.setAlpha(0.0); });
 
-    // Start idle breathing animation via anime.js
+    // ── Idle breathing + glow pulse via anime.js ─────────────
     const breathTarget = sprite || body;
     idleBreathe(breathTarget, breathTarget.scaleX, breathTarget.scaleY);
 
+    // Glow ring pulse
+    (function pulseRing() {
+      animate(glowRing, { alpha: 0.12, duration: 1800, easing: "easeInOutSine",
+        onComplete: () => animate(glowRing, { alpha: 0.0, duration: 1800, easing: "easeInOutSine", onComplete: pulseRing }) });
+    })();
+
     return {
-      container: c, body, sprite, hpBar, nameLabel, levelLabel, actionLabel, statusIcon,
+      container: c, body, sprite, hpBar, nameLabel, levelLabel, actionLabel, statusIcon, glowRing,
       cls, x: 100, y: 100, lastHp: 100, lastMaxHp: 100,
-      isMoving: false, idleTween: null, walkTween: null, currentAction: "",
+      isMoving: false, currentAction: "",
     };
   }
 
@@ -874,48 +980,98 @@ export class GameScene extends Phaser.Scene {
     const tid = mob.templateId || "giant_rat";
     const cfg = MOB_CONFIG[tid] || { color: 0xaa5533, size: 6, shape: "circle" };
 
-    // Shadow
-    c.add(this.add.ellipse(0, cfg.size + 2, cfg.size * 1.4, 4, 0x000000, 0.25));
+    // ── Mob shadow ────────────────────────────────────────────
+    c.add(this.add.ellipse(0, cfg.size + 3, cfg.size * 1.6, 5, 0x000000, 0.30));
 
-    // Threat indicator ring
-    c.add(this.add.circle(0, 0, cfg.size + 3, 0xff2200, 0.05));
+    // ── Threat aura (danger ring) ─────────────────────────────
+    c.add(this.add.circle(0, 0, cfg.size + 5, 0xff2200, 0.04));
+    c.add(this.add.circle(0, 0, cfg.size + 8, 0xff2200, 0.02));
 
-    // Body
+    // ── Body ─────────────────────────────────────────────────
     const body = this.add.graphics();
+    const darken = (col: number, f: number) => {
+      const r = Math.floor(((col >> 16) & 0xff) * f);
+      const g = Math.floor(((col >> 8) & 0xff) * f);
+      const b = Math.floor((col & 0xff) * f);
+      return (r << 16) | (g << 8) | b;
+    };
+    const lighter = (col: number, f: number) => {
+      const r = Math.min(255, Math.floor(((col >> 16) & 0xff) * f));
+      const g = Math.min(255, Math.floor(((col >> 8) & 0xff) * f));
+      const b = Math.min(255, Math.floor((col & 0xff) * f));
+      return (r << 16) | (g << 8) | b;
+    };
+
     if (cfg.shape === "blob") {
-      body.fillStyle(cfg.color, 0.85);
-      body.fillCircle(0, 1, cfg.size);
-      body.fillStyle(0xffffff, 0.2);
-      body.fillCircle(-2, -2, cfg.size * 0.4);
-      body.fillStyle(0x222222, 1);
-      body.fillCircle(-2, -1, 1.5);
-      body.fillCircle(2, -1, 1.5);
+      // Slime/blob — multi-layered for 3D look
+      body.fillStyle(darken(cfg.color, 0.5), 1);
+      body.fillCircle(1, 2, cfg.size);
+      body.fillStyle(cfg.color, 1);
+      body.fillCircle(0, 0, cfg.size);
+      body.fillStyle(lighter(cfg.color, 1.4), 0.5);
+      body.fillCircle(-cfg.size * 0.25, -cfg.size * 0.25, cfg.size * 0.55);
+      // Eyes
+      body.fillStyle(0x111111, 1);
+      body.fillCircle(-cfg.size * 0.3, -cfg.size * 0.1, cfg.size * 0.22);
+      body.fillCircle(cfg.size * 0.3, -cfg.size * 0.1, cfg.size * 0.22);
+      body.fillStyle(0xffffff, 0.9);
+      body.fillCircle(-cfg.size * 0.25, -cfg.size * 0.15, cfg.size * 0.1);
+      body.fillCircle(cfg.size * 0.35, -cfg.size * 0.15, cfg.size * 0.1);
+      // Mouth
+      body.fillStyle(darken(cfg.color, 0.4), 0.8);
+      body.fillRect(-cfg.size * 0.25, cfg.size * 0.2, cfg.size * 0.5, cfg.size * 0.15);
+
     } else if (cfg.shape === "hex") {
       const s = cfg.size;
-      body.fillStyle(cfg.color, 1);
+      // Build hex points
       const pts = [];
       for (let i = 0; i < 6; i++) {
         const a = (Math.PI / 3) * i - Math.PI / 2;
         pts.push(new Phaser.Math.Vector2(Math.cos(a) * s, Math.sin(a) * s));
       }
-      body.fillPoints(pts, true);
-      body.lineStyle(1.5, 0x000000, 0.3);
-      body.strokePoints(pts, true);
-      body.fillStyle(0xffffff, 0.1);
-      body.fillCircle(0, -2, s * 0.5);
-      body.fillStyle(0xff3322, 1);
-      body.fillCircle(-2, -1, 1.2);
-      body.fillCircle(2, -1, 1.2);
-    } else {
+      // Dark underside
+      body.fillStyle(darken(cfg.color, 0.55), 1);
+      body.fillPoints(pts.map(p => new Phaser.Math.Vector2(p.x + 1, p.y + 1)), true);
+      // Main body
       body.fillStyle(cfg.color, 1);
-      body.fillCircle(0, 0, cfg.size);
-      body.lineStyle(1, 0x000000, 0.2);
-      body.strokeCircle(0, 0, cfg.size);
-      body.fillStyle(0xffffff, 0.12);
-      body.fillCircle(-1, -2, cfg.size * 0.4);
-      body.fillStyle(0xffcc00, 1);
-      body.fillCircle(-2, -1, 1.2);
-      body.fillCircle(2, -1, 1.2);
+      body.fillPoints(pts, true);
+      // Rim highlight
+      body.lineStyle(2, lighter(cfg.color, 1.5), 0.5);
+      body.strokePoints(pts, true);
+      // Inner highlight disc
+      body.fillStyle(lighter(cfg.color, 1.6), 0.15);
+      body.fillCircle(-s * 0.15, -s * 0.2, s * 0.5);
+      // Glowing eyes
+      body.fillStyle(0xff2200, 1);
+      body.fillCircle(-s * 0.28, -s * 0.1, s * 0.2);
+      body.fillCircle(s * 0.28, -s * 0.1, s * 0.2);
+      body.fillStyle(0xff6644, 0.9);
+      body.fillCircle(-s * 0.28, -s * 0.15, s * 0.1);
+      body.fillCircle(s * 0.28, -s * 0.15, s * 0.1);
+
+    } else {
+      // Circle — multi-layer shading
+      const s = cfg.size;
+      body.fillStyle(darken(cfg.color, 0.5), 1);
+      body.fillCircle(1, 2, s);
+      body.fillStyle(cfg.color, 1);
+      body.fillCircle(0, 0, s);
+      // Fur/texture ring
+      body.lineStyle(1.5, darken(cfg.color, 0.65), 0.6);
+      body.strokeCircle(0, 0, s);
+      // Sheen
+      body.fillStyle(lighter(cfg.color, 1.5), 0.2);
+      body.fillCircle(-s * 0.28, -s * 0.28, s * 0.45);
+      // Eyes
+      body.fillStyle(0xffaa00, 1);
+      body.fillCircle(-s * 0.3, -s * 0.15, s * 0.22);
+      body.fillCircle(s * 0.3, -s * 0.15, s * 0.22);
+      body.fillStyle(0x1a1100, 1);
+      body.fillCircle(-s * 0.3, -s * 0.15, s * 0.13);
+      body.fillCircle(s * 0.3, -s * 0.15, s * 0.13);
+      body.fillStyle(0xffffff, 0.9);
+      body.fillCircle(-s * 0.26, -s * 0.18, s * 0.06);
+      body.fillCircle(s * 0.34, -s * 0.18, s * 0.06);
     }
     c.add(body);
 
@@ -947,18 +1103,32 @@ export class GameScene extends Phaser.Scene {
   private drawHpBar(g: Phaser.GameObjects.Graphics, hp: number, maxHp: number, width: number, yOff: number, isMob = false) {
     g.clear();
     const pct = Math.max(0, Math.min(1, hp / maxHp));
-    const h = isMob ? 2 : 3;
+    const h = isMob ? 3 : 4;
+    const r = h / 2;
 
-    g.fillStyle(0x000000, 0.5);
-    g.fillRoundedRect(-width / 2 - 1, yOff - 1, width + 2, h + 2, 1);
-    g.fillStyle(0x1a1a1a, 0.8);
-    g.fillRoundedRect(-width / 2, yOff, width, h, 1);
+    // Drop shadow
+    g.fillStyle(0x000000, 0.6);
+    g.fillRoundedRect(-width / 2 + 1, yOff + 1, width, h, r);
+    // Background track
+    g.fillStyle(0x0a0a12, 0.9);
+    g.fillRoundedRect(-width / 2, yOff, width, h, r);
+    // Track border
+    g.lineStyle(0.5, 0xffffff, 0.06);
+    g.strokeRoundedRect(-width / 2, yOff, width, h, r);
 
-    const fillColor = isMob ? 0xcc3322 :
-      pct < 0.3 ? 0xff3333 : pct < 0.6 ? 0xffaa22 : 0x44cc55;
     if (pct > 0) {
+      const fillColor = isMob ? 0xdd2211 :
+        pct < 0.3 ? 0xff2222 : pct < 0.6 ? 0xffaa22 : 0x33cc44;
+      const hiColor = isMob ? 0xff4422 :
+        pct < 0.3 ? 0xff5555 : pct < 0.6 ? 0xffcc66 : 0x55ee66;
+      const fillW = Math.max(r * 2, width * pct);
+
+      // Fill
       g.fillStyle(fillColor, 1);
-      g.fillRoundedRect(-width / 2, yOff, Math.max(2, width * pct), h, 1);
+      g.fillRoundedRect(-width / 2, yOff, fillW, h, r);
+      // Highlight stripe on top half
+      g.fillStyle(hiColor, 0.35);
+      g.fillRoundedRect(-width / 2 + 1, yOff + 0.5, Math.max(r, fillW - 2), h / 2 - 0.5, r * 0.5);
     }
   }
 
@@ -970,64 +1140,66 @@ export class GameScene extends Phaser.Scene {
   }
 
   private slashEffect(fromX: number, fromY: number, toX: number, toY: number) {
-    const g = this.add.graphics().setDepth(11);
     const angle = Math.atan2(toY - fromY, toX - fromX);
-
-    // Slash appears AT the target mob
     const hitX = toX;
     const hitY = toY;
-
-    // Draw 3-line slash burst at impact point
-    const slashLen = 16;
     const perpAngle = angle + Math.PI / 2;
+    const slashLen = 20;
 
-    // Main slash — thick white
-    g.lineStyle(3, 0xffffff, 0.9);
+    // ── X-slash burst at impact ─────────────────────────────
+    const g = this.add.graphics().setDepth(11).setAlpha(0.95);
+    // Outer white slash
+    g.lineStyle(4, 0xffffff, 0.95);
     g.lineBetween(
-      hitX + Math.cos(perpAngle) * slashLen,
-      hitY + Math.sin(perpAngle) * slashLen,
-      hitX - Math.cos(perpAngle) * slashLen,
-      hitY - Math.sin(perpAngle) * slashLen,
+      hitX + Math.cos(perpAngle) * slashLen, hitY + Math.sin(perpAngle) * slashLen,
+      hitX - Math.cos(perpAngle) * slashLen, hitY - Math.sin(perpAngle) * slashLen,
     );
-    // Cross slash — golden
-    g.lineStyle(2, 0xffdd44, 0.7);
+    // Cross slash
+    g.lineStyle(2.5, 0xffee44, 0.8);
     g.lineBetween(
-      hitX + Math.cos(perpAngle + 0.5) * slashLen * 0.9,
-      hitY + Math.sin(perpAngle + 0.5) * slashLen * 0.9,
-      hitX - Math.cos(perpAngle + 0.5) * slashLen * 0.9,
-      hitY - Math.sin(perpAngle + 0.5) * slashLen * 0.9,
+      hitX + Math.cos(perpAngle + 0.55) * slashLen * 0.85, hitY + Math.sin(perpAngle + 0.55) * slashLen * 0.85,
+      hitX - Math.cos(perpAngle + 0.55) * slashLen * 0.85, hitY - Math.sin(perpAngle + 0.55) * slashLen * 0.85,
     );
-    // Third slash — thin red
-    g.lineStyle(1.5, 0xff4444, 0.5);
+    // Red accent slash
+    g.lineStyle(1.5, 0xff4444, 0.6);
     g.lineBetween(
-      hitX + Math.cos(perpAngle - 0.4) * slashLen * 0.7,
-      hitY + Math.sin(perpAngle - 0.4) * slashLen * 0.7,
-      hitX - Math.cos(perpAngle - 0.4) * slashLen * 0.7,
-      hitY - Math.sin(perpAngle - 0.4) * slashLen * 0.7,
+      hitX + Math.cos(perpAngle - 0.35) * slashLen * 0.7, hitY + Math.sin(perpAngle - 0.35) * slashLen * 0.7,
+      hitX - Math.cos(perpAngle - 0.35) * slashLen * 0.7, hitY - Math.sin(perpAngle - 0.35) * slashLen * 0.7,
     );
+    this.effectLayer.add(g);
 
-    // Impact flash circle
-    const flash = this.add.circle(hitX, hitY, 6, 0xffffff, 0.5).setDepth(11);
+    // Animate slash expand + fade via anime.js
+    g.setScale(0.4);
+    animate(g, { scaleX: 1.2, scaleY: 1.2, alpha: 0, duration: 220, easing: "easeOutCubic", onComplete: () => g.destroy() });
+
+    // ── Shockwave ring ──────────────────────────────────────
+    const ring = this.add.circle(hitX, hitY, 4, 0xffffff, 0).setDepth(11);
+    ring.setStrokeStyle(2, 0xffffff, 0.8);
+    this.effectLayer.add(ring);
+    animate(ring, { scaleX: 4, scaleY: 4, alpha: 0, duration: 260, easing: "easeOutCubic", onComplete: () => ring.destroy() });
+
+    // ── Impact flash ────────────────────────────────────────
+    const flash = this.add.circle(hitX, hitY, 8, 0xffffff, 0.7).setDepth(12);
     this.effectLayer.add(flash);
-    animate(flash, { scaleX: 2, scaleY: 2, alpha: 0, duration: 180, easing: "easeOutQuad", onComplete: () => flash.destroy() });
+    animate(flash, { scaleX: 2.5, scaleY: 2.5, alpha: 0, duration: 160, easing: "easeOutQuad", onComplete: () => flash.destroy() });
 
-    // Small spark particles
-    for (let i = 0; i < 4; i++) {
-      const sparkAngle = perpAngle + (Math.random() - 0.5) * 2;
-      const sparkDist = Phaser.Math.Between(8, 16);
-      const spark = this.add.circle(hitX, hitY, 1.5, 0xffdd44, 0.8).setDepth(11);
+    // ── Sparks radiating outward ────────────────────────────
+    const sparkColors = [0xffffff, 0xffdd44, 0xff6644, 0xffaa22];
+    for (let i = 0; i < 7; i++) {
+      const sparkAngle = perpAngle + (Math.random() - 0.5) * 2.5;
+      const sparkDist = Phaser.Math.Between(10, 24);
+      const sz = Phaser.Math.FloatBetween(1, 2.5);
+      const spark = this.add.circle(hitX, hitY, sz, sparkColors[i % sparkColors.length], 0.9).setDepth(11);
       this.effectLayer.add(spark);
       animate(spark, {
         x: hitX + Math.cos(sparkAngle) * sparkDist,
-        y: hitY + Math.sin(sparkAngle) * sparkDist,
-        alpha: 0, duration: Phaser.Math.Between(150, 300),
-        easing: "easeOutQuad",
+        y: hitY + Math.sin(sparkAngle) * sparkDist - Phaser.Math.Between(2, 8),
+        alpha: 0, scaleX: 0.1, scaleY: 0.1,
+        duration: Phaser.Math.Between(180, 380),
+        easing: "easeOutCubic",
         onComplete: () => spark.destroy(),
       });
     }
-
-    this.effectLayer.add(g);
-    animate(g, { alpha: 0, duration: 200, easing: "easeOutQuad", onComplete: () => g.destroy() });
   }
 
   private deathBurst(x: number, y: number, color: number) {
@@ -1085,37 +1257,25 @@ export class GameScene extends Phaser.Scene {
   }
 
   private levelUpFx(x: number, y: number) {
-    // Text
-    const t = this.add.text(x, y - 24, "LEVEL UP!", {
-      fontSize: "15px", color: "#ffcc33", fontFamily: "Arial",
-      fontStyle: "bold", stroke: "#000000", strokeThickness: 4,
-    }).setOrigin(0.5).setDepth(12);
-    this.effectLayer.add(t);
-    this.tweens.add({
-      targets: t, y: y - 60, alpha: 0, scaleX: 1.4, scaleY: 1.4,
-      duration: 1800, ease: "Power2", onComplete: () => t.destroy(),
-    });
+    // DOM banner via anime.js
+    spawnBanner("LEVEL UP!", "Keep fighting!", "levelup");
 
     // Expanding ring
     const ring = this.add.circle(x, y, 8, 0xffcc33, 0.5).setDepth(11);
     this.effectLayer.add(ring);
-    this.tweens.add({
-      targets: ring, scaleX: 5, scaleY: 5, alpha: 0,
-      duration: 900, ease: "Power2", onComplete: () => ring.destroy(),
-    });
+    animate(ring, { scaleX: 5, scaleY: 5, alpha: 0, duration: 900, easing: "easeOutCubic", onComplete: () => ring.destroy() });
 
-    // Sparkle particles — more and bigger
+    // Sparkle particles
     for (let i = 0; i < 10; i++) {
       const angle = (Math.PI * 2 / 10) * i;
       const dist = Phaser.Math.Between(25, 40);
       const spark = this.add.circle(x, y, Phaser.Math.Between(1, 3), 0xffee88, 0.9).setDepth(11);
       this.effectLayer.add(spark);
-      this.tweens.add({
-        targets: spark,
+      animate(spark, {
         x: x + Math.cos(angle) * dist,
         y: y + Math.sin(angle) * dist,
         alpha: 0, scaleX: 0.2, scaleY: 0.2,
-        duration: Phaser.Math.Between(500, 900), ease: "Power2",
+        duration: Phaser.Math.Between(500, 900), easing: "easeOutCubic",
         onComplete: () => spark.destroy(),
       });
     }
@@ -1123,10 +1283,7 @@ export class GameScene extends Phaser.Scene {
     // Golden pillar effect
     const pillar = this.add.rectangle(x, y - 40, 4, 80, 0xffcc33, 0.3).setDepth(11);
     this.effectLayer.add(pillar);
-    this.tweens.add({
-      targets: pillar, scaleX: 0, alpha: 0, duration: 800,
-      ease: "Power2", onComplete: () => pillar.destroy(),
-    });
+    animate(pillar, { scaleX: 0, alpha: 0, duration: 800, easing: "easeOutCubic", onComplete: () => pillar.destroy() });
   }
 
   // ── Public API ─────────────────────────────────────────

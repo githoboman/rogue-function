@@ -7,6 +7,35 @@ import Phaser from "phaser";
 import { PreloadScene } from "./scenes/PreloadScene";
 import { GameScene }    from "./scenes/GameScene";
 import { gameWS }       from "./ws";
+import {
+  animate,
+  animateCardEnter,
+  flashCardDamage,
+  flashCardLevelUp,
+  animateLogEntry,
+  staggerRows,
+  animateNumber,
+  spawnBanner,
+} from "./anime-utils";
+
+// ── Kill Feed (in-game overlay entries) ──────────────────────────────────────
+function addKillfeed(text: string, type: "kill" | "level" | "quest" | "streak") {
+  const feed = document.getElementById("killfeed");
+  if (!feed) return;
+  const el = document.createElement("div");
+  el.className = `kf-entry ${type === "kill" ? "" : type}`;
+  el.textContent = text;
+  feed.appendChild(el);
+
+  // Slide in from right
+  animate(el, { translateX: [60, 0], opacity: [0, 1], duration: 240, easing: "easeOutCubic" });
+  // Fade out after 3s
+  animate(el, { opacity: 0, translateX: [0, -20], duration: 400, delay: 2800, easing: "easeInCubic",
+    onComplete: () => el.remove() });
+
+  // Keep max 6 entries
+  while (feed.children.length > 6) feed.removeChild(feed.firstChild!);
+}
 
 // ============================================================
 // PHASER CONFIG
@@ -133,15 +162,19 @@ gameWS.onEvent((event: any) => {
   const gs = game.scene.getScene("GameScene") as GameScene | null;
 
   switch (event.type) {
-    case "combat_hit":
+    case "combat_hit": {
       addLog(`${d.playerName} hits ${d.mobName} for ${d.damage}${d.crit ? " CRIT" : ""}`, "combat");
+      const hitCard = document.querySelector(`[data-agent="${d.playerId}"]`) as HTMLElement | null;
+      if (hitCard) flashCardDamage(hitCard);
       break;
+    }
 
     case "mob_died": {
       globalStats.totalKills++;
       globalStats.totalGoldEarned += d.goldDropped || 0;
       addLog(`${d.mobName} slain! +${d.xpGained}xp +${d.goldDropped}g`, "combat");
       if (d.loot?.length) addLog(`Loot: ${d.loot.join(", ")}`, "loot");
+      addKillfeed(`${d.playerName || "?"} slew ${d.mobName} +${d.goldDropped}g`, "kill");
 
       // Track earnings per agent
       if (d.playerId) {
@@ -165,22 +198,37 @@ gameWS.onEvent((event: any) => {
         streak.lastKillTime = now;
         killStreaks.set(d.playerName, streak);
 
-        if (streak.count === 3) addLog(`${d.playerName} is on a KILLING SPREE!`, "streak");
-        else if (streak.count === 5) addLog(`${d.playerName} is UNSTOPPABLE!`, "streak");
-        else if (streak.count === 8) addLog(`${d.playerName} is GODLIKE!`, "streak");
+        if (streak.count === 3) {
+          addLog(`${d.playerName} is on a KILLING SPREE!`, "streak");
+          addKillfeed(`${d.playerName}: KILLING SPREE!`, "streak");
+          spawnBanner("KILLING SPREE", d.playerName, "streak");
+        } else if (streak.count === 5) {
+          addLog(`${d.playerName} is UNSTOPPABLE!`, "streak");
+          addKillfeed(`${d.playerName}: UNSTOPPABLE!`, "streak");
+          spawnBanner("UNSTOPPABLE", d.playerName, "streak");
+        } else if (streak.count === 8) {
+          addLog(`${d.playerName} is GODLIKE!`, "streak");
+          addKillfeed(`${d.playerName}: GODLIKE!`, "streak");
+          spawnBanner("GODLIKE", d.playerName, "streak");
+        }
       }
       break;
     }
 
     case "player_died":
       addLog(`${d.playerName} was slain!`, "death");
+      addKillfeed(`${d.playerName} fell in battle`, "kill");
       killStreaks.delete(d.playerName);
       break;
 
-    case "player_levelup":
+    case "player_levelup": {
       addLog(`${d.playerName} reached Level ${d.newLevel}!`, "level");
       gs?.onLevelUp?.(d.playerId, d.newLevel);
+      addKillfeed(`${d.playerName} → Level ${d.newLevel}!`, "level");
+      const lvlCard = document.querySelector(`[data-agent="${d.playerId}"]`) as HTMLElement | null;
+      if (lvlCard) flashCardLevelUp(lvlCard);
       break;
+    }
 
     case "quest_accepted":
       addLog(`${d.playerName} accepted: ${d.questName}`, "quest");
@@ -188,6 +236,7 @@ gameWS.onEvent((event: any) => {
 
     case "quest_completed": {
       addLog(`${d.playerName} completed: ${d.questName} (+${d.goldReward}g +${d.xpReward}xp)`, "quest");
+      addKillfeed(`${d.playerName}: ${d.questName} ✓`, "quest");
       // Track quest earnings
       if (d.playerId) {
         const e = agentEarnings.get(d.playerId);
@@ -229,14 +278,22 @@ document.querySelectorAll(".zone-tab").forEach(tab => {
 // TOPBAR STATS
 // ============================================================
 
+let _prevKills = 0;
+let _prevGold = 0;
 function updateTopbarStats(agents: any[]): void {
   globalStats.playerCount = agents.length;
   const playersEl = document.getElementById("stat-players");
   const killsEl = document.getElementById("stat-kills");
   const goldEl = document.getElementById("stat-gold");
   if (playersEl) playersEl.textContent = String(globalStats.playerCount);
-  if (killsEl) killsEl.textContent = String(globalStats.totalKills);
-  if (goldEl) goldEl.textContent = formatGold(globalStats.totalGoldEarned);
+  if (killsEl && globalStats.totalKills !== _prevKills) {
+    animateNumber(killsEl, _prevKills, globalStats.totalKills, 400);
+    _prevKills = globalStats.totalKills;
+  }
+  if (goldEl && globalStats.totalGoldEarned !== _prevGold) {
+    animateNumber(goldEl, _prevGold, globalStats.totalGoldEarned, 600);
+    _prevGold = globalStats.totalGoldEarned;
+  }
 }
 
 function formatGold(g: number): string {
@@ -310,6 +367,8 @@ function updateAgentPanel(agents: any[]): void {
         <div class="agent-action" data-action>&mdash;</div>
       `;
       panel.appendChild(card);
+      // Animate new card entering
+      animateCardEnter(card, panel.children.length - 1);
     } else {
       const hpEl   = card.querySelector("[data-hp]") as HTMLElement;
       const hpValEl = card.querySelector("[data-hpval]") as HTMLElement;
@@ -412,6 +471,7 @@ function updateLeaderboard(agents: any[]): void {
   const medals = ["gold", "silver", "bronze"];
   const medalIcons = ["\u{1F947}", "\u{1F948}", "\u{1F949}"];
 
+  const prevContent = panel.innerHTML;
   panel.innerHTML = scored.map((s, i) => {
     const rankClass = i < 3 ? medals[i] : "normal";
     const icon = i < 3 ? medalIcons[i] : `${i + 1}`;
@@ -431,6 +491,9 @@ function updateLeaderboard(agents: any[]): void {
       </div>
     </div>`;
   }).join("");
+
+  // Stagger-animate rows when leaderboard changes
+  if (prevContent !== panel.innerHTML) staggerRows(panel);
 }
 
 // ============================================================
@@ -452,6 +515,7 @@ function addLog(text: string, type: string): void {
   entry.className = `event-entry ${type}`;
   entry.innerHTML = `<span class="event-time">${time}</span><span class="event-text">${text}</span>`;
   panel.appendChild(entry);
+  animateLogEntry(entry);
   panel.scrollTop = panel.scrollHeight;
   while (panel.children.length > 100) panel.removeChild(panel.firstChild!);
 }
