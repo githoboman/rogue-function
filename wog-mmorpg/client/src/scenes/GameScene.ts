@@ -210,142 +210,189 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Clean tile-based ground using Kenney Tiny Town tiles */
+  /**
+   * Smooth painterly ground — no tiles, no grid.
+   * Uses a RenderTexture built from overlapping large ellipses and gradient bands,
+   * giving a soft blended look similar to painted game backgrounds.
+   */
   private drawTileGround(pal: typeof ZONE_PALETTE["human_meadow"], isDark: boolean) {
-    const tileScale = 2.5;
-    const ts = 16 * tileScale; // 40px per tile
-    const cols = Math.ceil(this.W / ts) + 1;
-    const rows = Math.ceil(this.H / ts) + 1;
-    const grassTiles = isDark ? TOWN_TILES.grassDark : TOWN_TILES.grass;
-
-    // Lay tile grid
-    for (let col = 0; col < cols; col++) {
-      for (let row = 0; row < rows; row++) {
-        const frame = grassTiles[Phaser.Math.Between(0, grassTiles.length - 1)];
-        const img = this.add.image(col * ts, row * ts, "town", frame)
-          .setScale(tileScale)
-          .setTint(pal.tint);
-        this.groundLayer.add(img);
-      }
-    }
-
-    // ── Dirt path — smooth curved path using path tiles ──────
-    const pathTiles = TOWN_TILES.dirtPath;
-    const pathY = this.H * 0.45;
-    for (let px = -ts; px < this.W + ts; px += ts * 0.7) {
-      const py = pathY + Math.sin(px * 0.005) * 70 + Math.sin(px * 0.015) * 25;
-      // Main path (2 tiles wide)
-      for (let row = -1; row <= 1; row++) {
-        const frame = pathTiles[Phaser.Math.Between(0, pathTiles.length - 1)];
-        const img = this.add.image(px, py + row * ts * 0.6, "town", frame)
-          .setScale(tileScale)
-          .setTint(pal.tint)
-          .setAlpha(row === 0 ? 0.9 : 0.5);
-        this.groundLayer.add(img);
-      }
-    }
-
-    // ── Second smaller path (branching) ──────────────────────
-    if (!isDark) {
-      const branchX = this.W * 0.35;
-      for (let py = pathY; py < this.H - 40; py += ts * 0.7) {
-        const px = branchX + Math.sin(py * 0.01) * 30;
-        const frame = pathTiles[Phaser.Math.Between(0, pathTiles.length - 1)];
-        this.groundLayer.add(
-          this.add.image(px, py, "town", frame).setScale(tileScale).setTint(pal.tint).setAlpha(0.6)
-        );
-      }
-    }
-
-    // ── Flower patches (meadows) ─────────────────────────────
-    if (!isDark && TOWN_TILES.flower.length > 0) {
-      const clusters = this.currentZone === "human_meadow" ? 8 : 4;
-      for (let c = 0; c < clusters; c++) {
-        const cx = Phaser.Math.Between(60, this.W - 60);
-        const cy = Phaser.Math.Between(60, this.H - 60);
-        for (let f = 0; f < Phaser.Math.Between(3, 6); f++) {
-          const fx = cx + Phaser.Math.Between(-30, 30);
-          const fy = cy + Phaser.Math.Between(-20, 20);
-          this.groundLayer.add(
-            this.add.image(fx, fy, "town", TOWN_TILES.flower[0]).setScale(tileScale).setTint(pal.tint).setAlpha(0.7)
-          );
-        }
-      }
-    }
-
-    // ── Overlay: subtle ambient color wash for atmosphere ─────
-    const overlay = this.add.graphics();
-    overlay.fillStyle(pal.bg, 0.08);
-    overlay.fillRect(0, 0, this.W, this.H);
-    this.groundLayer.add(overlay);
+    this.drawSmoothGround(pal, isDark);
   }
 
-  /** Fallback: graphics-only ground (no spritesheets available) */
   private drawGraphicsGround(pal: typeof ZONE_PALETTE["human_meadow"], isDark: boolean) {
-    const rt = this.add.renderTexture(0, 0, this.W, this.H).setOrigin(0, 0);
+    this.drawSmoothGround(pal, isDark);
+  }
+
+  private drawSmoothGround(pal: typeof ZONE_PALETTE["human_meadow"], isDark: boolean) {
+    const W = this.W;
+    const H = this.H;
+    const rt = this.add.renderTexture(0, 0, W, H).setOrigin(0, 0);
     const g = this.make.graphics({ x: 0, y: 0 });
 
-    // Clean base fill — larger tiles, less noise
-    const ts = 32;
-    const grassColors = [pal.bg, pal.grass1, pal.grass2, pal.grass3];
-    for (let x = 0; x < this.W; x += ts) {
-      for (let y = 0; y < this.H; y += ts) {
-        // Use a deterministic-ish pattern so it doesn't look like TV static
-        const idx = ((x * 7 + y * 13) >> 4) % grassColors.length;
-        g.fillStyle(grassColors[idx], 1);
-        g.fillRect(x, y, ts, ts);
-      }
+    // ── 1. Solid base colour ────────────────────────────────────
+    g.fillStyle(pal.bg, 1);
+    g.fillRect(0, 0, W, H);
+
+    // ── 2. Large soft gradient bands (horizontal) ───────────────
+    // Mimic the look of sky-lit ground — lighter near horizon, darker at edges
+    const bandColors = [pal.grass1, pal.grass2, pal.grass3, pal.bg, pal.grass1];
+    const bandCount = 6;
+    for (let b = 0; b < bandCount; b++) {
+      const y = (H / bandCount) * b;
+      const col = bandColors[b % bandColors.length];
+      // Each band is a very wide, very tall ellipse so edges blend softly
+      g.fillStyle(col, 0.22);
+      g.fillEllipse(W * 0.5, y + H * 0.08, W * 1.6, H * 0.55);
     }
 
-    // Smooth dirt path — drawn as overlapping circles for organic shape
-    const pathY = this.H * 0.45;
-    for (let px = 0; px < this.W; px += 6) {
-      const py = pathY + Math.sin(px * 0.005) * 70 + Math.sin(px * 0.015) * 25;
-      // Path edge (wider, darker)
-      g.fillStyle(pal.pathEdge, 0.4);
+    // ── 3. Large painterly blobs for colour variation ───────────
+    // 60–120 large overlapping soft ellipses — the key to no-grid look
+    const blobCount = isDark ? 55 : 80;
+    const blobColors = [pal.bg, pal.grass1, pal.grass2, pal.grass3, pal.detail];
+    for (let i = 0; i < blobCount; i++) {
+      const bx = Phaser.Math.Between(0, W);
+      const by = Phaser.Math.Between(0, H);
+      const bw = Phaser.Math.Between(60, 200);
+      const bh = Phaser.Math.Between(30, 100);
+      const col = blobColors[i % blobColors.length];
+      g.fillStyle(col, Phaser.Math.FloatBetween(0.06, 0.18));
+      g.fillEllipse(bx, by, bw, bh);
+    }
+
+    // ── 4. Smooth dirt path ─────────────────────────────────────
+    // Overlapping circles along a sine wave — gives organic soft edge
+    const pathY = H * 0.45;
+    // Wide soft shadow under path
+    for (let px = -20; px < W + 20; px += 4) {
+      const py = pathY + Math.sin(px * 0.006) * 65 + Math.sin(px * 0.018) * 22;
+      g.fillStyle(pal.pathEdge, 0.12);
+      g.fillCircle(px, py, 26);
+    }
+    // Main path body
+    for (let px = -20; px < W + 20; px += 4) {
+      const py = pathY + Math.sin(px * 0.006) * 65 + Math.sin(px * 0.018) * 22;
+      g.fillStyle(pal.path, 0.38);
       g.fillCircle(px, py, 18);
-      // Path center (lighter)
-      g.fillStyle(pal.path, 0.5);
-      g.fillCircle(px, py, 13);
-      // Highlight center
-      g.fillStyle(pal.path, 0.25);
-      g.fillCircle(px, py - 2, 8);
+    }
+    // Path highlight centre-line
+    for (let px = -20; px < W + 20; px += 5) {
+      const py = pathY + Math.sin(px * 0.006) * 65 + Math.sin(px * 0.018) * 22;
+      g.fillStyle(0xffffff, 0.05);
+      g.fillCircle(px, py - 2, 9);
+    }
+    // Pebbles / texture dots along path
+    for (let i = 0; i < 40; i++) {
+      const px = Phaser.Math.Between(0, W);
+      const pbase = pathY + Math.sin(px * 0.006) * 65 + Math.sin(px * 0.018) * 22;
+      const py = pbase + Phaser.Math.Between(-10, 10);
+      g.fillStyle(pal.pathEdge, 0.25);
+      g.fillCircle(px, py, Phaser.Math.Between(1, 3));
     }
 
-    // Grass highlight patches — organic blobs, not tiny dots
-    const numPatches = isDark ? 15 : 40;
-    for (let i = 0; i < numPatches; i++) {
-      const px = Phaser.Math.Between(20, this.W - 20);
-      const py = Phaser.Math.Between(20, this.H - 20);
-      const size = Phaser.Math.Between(8, 20);
-      g.fillStyle(pal.detail, 0.15);
-      g.fillEllipse(px, py, size * 2, size * 1.2);
+    // ── 5. Grass texture — soft layered tufts ──────────────────
+    // Small ellipses clustered in patches — reads as texture, not tiles
+    const tufts = isDark ? 120 : 200;
+    for (let i = 0; i < tufts; i++) {
+      const tx = Phaser.Math.Between(0, W);
+      const ty = Phaser.Math.Between(0, H);
+      g.fillStyle(pal.detail, Phaser.Math.FloatBetween(0.06, 0.14));
+      g.fillEllipse(tx, ty, Phaser.Math.Between(6, 22), Phaser.Math.Between(3, 10));
     }
 
-    // Flower clusters (meadows) — grouped, not scattered randomly
+    // ── 6. Flowers / highlights (bright zones only) ─────────────
     if (!isDark) {
-      const flowerColors = [0xf0e050, 0xe8c040, 0xffffff, 0xf0a0a0, 0xa0d0f0];
-      const clusters = this.currentZone === "human_meadow" ? 10 : 5;
-      for (let c = 0; c < clusters; c++) {
-        const cx = Phaser.Math.Between(40, this.W - 40);
-        const cy = Phaser.Math.Between(40, this.H - 40);
-        const clusterSize = Phaser.Math.Between(4, 8);
-        for (let f = 0; f < clusterSize; f++) {
-          const fx = cx + Phaser.Math.Between(-15, 15);
-          const fy = cy + Phaser.Math.Between(-10, 10);
-          g.fillStyle(flowerColors[Phaser.Math.Between(0, flowerColors.length - 1)], 0.7);
-          g.fillCircle(fx, fy, Phaser.Math.Between(1, 2.5));
+      const flowerPalette = this.currentZone === "human_meadow"
+        ? [0xf5e860, 0xffffff, 0xffb0c0, 0xa8d8f0]
+        : [0xaaffaa, 0xeeffcc, 0xffffff];
+      const clusterCount = this.currentZone === "human_meadow" ? 12 : 6;
+      for (let c = 0; c < clusterCount; c++) {
+        const cx = Phaser.Math.Between(40, W - 40);
+        const cy = Phaser.Math.Between(40, H - 40);
+        // Cluster glow
+        g.fillStyle(flowerPalette[c % flowerPalette.length], 0.08);
+        g.fillCircle(cx, cy, Phaser.Math.Between(18, 35));
+        // Individual flower dots
+        for (let f = 0; f < Phaser.Math.Between(5, 10); f++) {
+          const fx = cx + Phaser.Math.Between(-20, 20);
+          const fy = cy + Phaser.Math.Between(-14, 14);
+          g.fillStyle(flowerPalette[f % flowerPalette.length], 0.7);
+          g.fillCircle(fx, fy, Phaser.Math.FloatBetween(1, 2.5));
+          // Tiny white centre
+          g.fillStyle(0xffffff, 0.5);
+          g.fillCircle(fx, fy, 0.6);
         }
       }
     }
 
-    // Dark forest: fog patches
+    // ── 7. Dark forest mood — deep fog pools ───────────────────
     if (isDark) {
+      // Heavy vignette — dark at edges, slightly lighter centre
+      for (let r = 0; r < 5; r++) {
+        const fr = 0.9 - r * 0.15;
+        g.fillStyle(0x0a1018, 0.12 + r * 0.04);
+        g.fillEllipse(W * 0.5, H * 0.5, W * fr * 2.2, H * fr * 2.2);
+      }
+      // Puddle reflections
       for (let i = 0; i < 8; i++) {
-        const fx = Phaser.Math.Between(0, this.W);
-        const fy = Phaser.Math.Between(0, this.H);
-        g.fillStyle(0x334455, 0.06);
-        g.fillEllipse(fx, fy, Phaser.Math.Between(80, 200), Phaser.Math.Between(40, 80));
+        const px = Phaser.Math.Between(40, W - 40);
+        const py = Phaser.Math.Between(40, H - 40);
+        const pw = Phaser.Math.Between(22, 55);
+        g.fillStyle(0x1a2a3a, 0.28);
+        g.fillEllipse(px, py, pw, pw * 0.4);
+        g.fillStyle(0x445566, 0.1);
+        g.fillEllipse(px + pw * 0.1, py - pw * 0.08, pw * 0.4, pw * 0.15);
+      }
+      // Spore/mist patches
+      for (let i = 0; i < 12; i++) {
+        const mx = Phaser.Math.Between(0, W);
+        const my = Phaser.Math.Between(H * 0.3, H);
+        g.fillStyle(0x334455, 0.05);
+        g.fillEllipse(mx, my, Phaser.Math.Between(80, 220), Phaser.Math.Between(20, 55));
+      }
+      // Bioluminescent dots (blue-green glow points)
+      for (let i = 0; i < 18; i++) {
+        const gx = Phaser.Math.Between(20, W - 20);
+        const gy = Phaser.Math.Between(20, H - 20);
+        g.fillStyle(0x44bbaa, 0.18);
+        g.fillCircle(gx, gy, Phaser.Math.Between(2, 5));
+        g.fillStyle(0x88ffee, 0.08);
+        g.fillCircle(gx, gy, Phaser.Math.Between(6, 14));
+      }
+    }
+
+    // ── 8. Wild meadow — scattered ponds ───────────────────────
+    if (this.currentZone === "wild_meadow") {
+      for (let i = 0; i < 5; i++) {
+        const px = Phaser.Math.Between(60, W - 60);
+        const py = Phaser.Math.Between(60, H - 60);
+        const pw = Phaser.Math.Between(28, 65);
+        // Water body
+        g.fillStyle(0x2a6a88, 0.22);
+        g.fillEllipse(px, py, pw, pw * 0.42);
+        // Shimmer
+        g.fillStyle(0x88ccee, 0.1);
+        g.fillEllipse(px - pw * 0.12, py - pw * 0.06, pw * 0.45, pw * 0.18);
+        // Lily pads
+        for (let l = 0; l < 3; l++) {
+          const lx = px + Phaser.Math.Between(-pw * 0.35, pw * 0.35);
+          const ly = py + Phaser.Math.Between(-pw * 0.1, pw * 0.1);
+          g.fillStyle(0x44aa55, 0.55);
+          g.fillCircle(lx, ly, Phaser.Math.Between(2, 4));
+        }
+      }
+    }
+
+    // ── 9. Subtle vignette on all zones ────────────────────────
+    // Dark gradient at corners/edges — adds cinematic depth
+    if (!isDark) {
+      g.fillStyle(0x000000, 0.08);
+      g.fillRect(0, 0, W, H); // very faint overall darkening
+      // Corner darks
+      for (let cx = 0; cx <= 1; cx++) {
+        for (let cy2 = 0; cy2 <= 1; cy2++) {
+          g.fillStyle(0x000000, 0.12);
+          g.fillEllipse(cx * W, cy2 * H, W * 0.7, H * 0.7);
+        }
       }
     }
 
@@ -676,7 +723,7 @@ export class GameScene extends Phaser.Scene {
             x: lungeX, y: lungeY,
             duration: 110, easing: "easeInQuad",
             onComplete: () => {
-              this.slashEffect(s.container.x, s.container.y, m.container.x, m.container.y);
+              this.slashEffect(s.container.x, s.container.y, m.container.x, m.container.y, e.crit);
               this.dmgPopup(m.container.x, m.container.y - 16, e.damage, e.crit);
               // mob recoil
               const rx = m.container.x + (dx / dist) * 6;
@@ -761,7 +808,7 @@ export class GameScene extends Phaser.Scene {
     const dy = ty - s.y;
     const moved = Math.abs(dx) > 2 || Math.abs(dy) > 2;
 
-    // Flip body to face movement direction (3.5× scale preserved)
+    // Flip body to face movement direction
     if (Math.abs(dx) > 4) {
       const absX = Math.abs(s.body.scaleX);
       s.body.setScale(dx < 0 ? -absX : absX, s.body.scaleY);
@@ -1128,8 +1175,8 @@ export class GameScene extends Phaser.Scene {
 
   private mkAgent(name: string, cls: string): AgentSprite {
     const cfg = CLASS_CONFIG[cls] || CLASS_CONFIG.Warrior;
-    // Scale factor: pixel-art units → screen pixels. 3.5× makes 32px chars read well.
-    const SC = 3.5;
+    // Scale factor: pixel-art units → screen pixels.
+    const SC = 1.75;
     const c = this.add.container(100, 100);
 
     // ── Outer glow ring (pulsing halo) ──────────────────────
@@ -1890,8 +1937,8 @@ export class GameScene extends Phaser.Scene {
     const tid = mob.templateId || "giant_rat";
     const cfg = MOB_CONFIG[tid] || MOB_CONFIG.giant_rat;
 
-    // Scale mob sprites — smaller mobs at 2×, bosses at 3×
-    const SC = cfg.size >= 14 ? 3.0 : cfg.size >= 10 ? 2.5 : 2.0;
+    // Scale mob sprites — smaller mobs at 1×, bosses at 1.5×
+    const SC = cfg.size >= 14 ? 1.5 : cfg.size >= 10 ? 1.25 : 1.0;
 
     // ── Mob shadow ────────────────────────────────────────────
     c.add(this.add.ellipse(0, cfg.size * SC * 0.55, cfg.size * SC * 0.85, cfg.size * SC * 0.22, 0x000000, 0.30));
@@ -1977,66 +2024,143 @@ export class GameScene extends Phaser.Scene {
     spawnDmgNumber(x, y, dmg, crit);
   }
 
-  private slashEffect(fromX: number, fromY: number, toX: number, toY: number) {
+  private slashEffect(fromX: number, fromY: number, toX: number, toY: number, isCrit = false) {
     const angle = Math.atan2(toY - fromY, toX - fromX);
     const hitX = toX;
     const hitY = toY;
-    const perpAngle = angle + Math.PI / 2;
-    const slashLen = 20;
+    const perp = angle + Math.PI / 2;
+    const tl = createTimeline();
 
-    // ── X-slash burst at impact ─────────────────────────────
-    const g = this.add.graphics().setDepth(11).setAlpha(0.95);
-    // Outer white slash
-    g.lineStyle(4, 0xffffff, 0.95);
-    g.lineBetween(
-      hitX + Math.cos(perpAngle) * slashLen, hitY + Math.sin(perpAngle) * slashLen,
-      hitX - Math.cos(perpAngle) * slashLen, hitY - Math.sin(perpAngle) * slashLen,
-    );
-    // Cross slash
-    g.lineStyle(2.5, 0xffee44, 0.8);
-    g.lineBetween(
-      hitX + Math.cos(perpAngle + 0.55) * slashLen * 0.85, hitY + Math.sin(perpAngle + 0.55) * slashLen * 0.85,
-      hitX - Math.cos(perpAngle + 0.55) * slashLen * 0.85, hitY - Math.sin(perpAngle + 0.55) * slashLen * 0.85,
-    );
-    // Red accent slash
-    g.lineStyle(1.5, 0xff4444, 0.6);
-    g.lineBetween(
-      hitX + Math.cos(perpAngle - 0.35) * slashLen * 0.7, hitY + Math.sin(perpAngle - 0.35) * slashLen * 0.7,
-      hitX - Math.cos(perpAngle - 0.35) * slashLen * 0.7, hitY - Math.sin(perpAngle - 0.35) * slashLen * 0.7,
-    );
-    this.effectLayer.add(g);
+    // ── 1. Swoosh trail — arc from attacker toward target ──────
+    // Drawn as a series of fading ellipses along the attack path
+    const trailCount = 5;
+    for (let i = 0; i < trailCount; i++) {
+      const t = i / trailCount;
+      const tx = fromX + (hitX - fromX) * t;
+      const ty = fromY + (hitY - fromY) * t;
+      const trail = this.add.graphics().setDepth(10).setAlpha(0.35 * (1 - t));
+      trail.lineStyle(isCrit ? 5 : 3, isCrit ? 0xffaa22 : 0xffffff, 1);
+      const hw = (isCrit ? 16 : 10) * (1 - t * 0.4);
+      trail.lineBetween(
+        tx + Math.cos(perp) * hw, ty + Math.sin(perp) * hw,
+        tx - Math.cos(perp) * hw, ty - Math.sin(perp) * hw,
+      );
+      this.effectLayer.add(trail);
+      animate(trail, { alpha: 0, duration: 160 + i * 20, delay: i * 18, easing: "easeOutQuad", onComplete: () => trail.destroy() });
+    }
 
-    // Animate slash expand + fade via anime.js
-    g.setScale(0.4);
-    animate(g, { scaleX: 1.2, scaleY: 1.2, alpha: 0, duration: 220, easing: "easeOutCubic", onComplete: () => g.destroy() });
+    // ── 2. Main slash arc at impact point ──────────────────────
+    const slash = this.add.graphics().setDepth(12);
+    slash.setScale(0.3);
+    const slashLen = isCrit ? 28 : 18;
 
-    // ── Shockwave ring ──────────────────────────────────────
-    const ring = this.add.circle(hitX, hitY, 4, 0xffffff, 0).setDepth(11);
-    ring.setStrokeStyle(2, 0xffffff, 0.8);
+    // Core slash — thick bright white
+    slash.lineStyle(isCrit ? 6 : 4, 0xffffff, 1);
+    slash.lineBetween(
+      Math.cos(perp) * slashLen, Math.sin(perp) * slashLen,
+      -Math.cos(perp) * slashLen, -Math.sin(perp) * slashLen,
+    );
+    // Color overlay — class-tinted
+    slash.lineStyle(isCrit ? 4 : 2.5, isCrit ? 0xff8800 : 0xaaddff, 0.85);
+    slash.lineBetween(
+      Math.cos(perp + 0.18) * slashLen * 0.9, Math.sin(perp + 0.18) * slashLen * 0.9,
+      -Math.cos(perp + 0.18) * slashLen * 0.9, -Math.sin(perp + 0.18) * slashLen * 0.9,
+    );
+    // Shadow slash — offset and dark for depth
+    slash.lineStyle(isCrit ? 3 : 2, isCrit ? 0xff4400 : 0x4466aa, 0.5);
+    slash.lineBetween(
+      Math.cos(perp - 0.28) * slashLen * 0.75, Math.sin(perp - 0.28) * slashLen * 0.75,
+      -Math.cos(perp - 0.28) * slashLen * 0.75, -Math.sin(perp - 0.28) * slashLen * 0.75,
+    );
+    slash.setPosition(hitX, hitY);
+    this.effectLayer.add(slash);
+
+    tl.add(slash, {
+      scaleX: isCrit ? 1.5 : 1.1,
+      scaleY: isCrit ? 1.5 : 1.1,
+      duration: isCrit ? 80 : 60,
+      easing: "easeOutBack",
+    });
+    tl.add(slash, {
+      scaleX: 0.05, scaleY: 0.05,
+      alpha: 0,
+      duration: isCrit ? 200 : 160,
+      easing: "easeInQuad",
+      onComplete: () => slash.destroy(),
+    });
+
+    // ── 3. Shockwave ring expanding outward ─────────────────────
+    const ring = this.add.graphics().setDepth(11);
+    ring.lineStyle(isCrit ? 3 : 2, isCrit ? 0xff8833 : 0xffffff, 0.9);
+    ring.strokeCircle(0, 0, 6);
+    ring.setPosition(hitX, hitY);
     this.effectLayer.add(ring);
-    animate(ring, { scaleX: 4, scaleY: 4, alpha: 0, duration: 260, easing: "easeOutCubic", onComplete: () => ring.destroy() });
+    animate(ring, {
+      scaleX: isCrit ? 6 : 4, scaleY: isCrit ? 6 : 4,
+      alpha: 0,
+      duration: isCrit ? 380 : 260,
+      easing: "easeOutCubic",
+      onComplete: () => ring.destroy(),
+    });
 
-    // ── Impact flash ────────────────────────────────────────
-    const flash = this.add.circle(hitX, hitY, 8, 0xffffff, 0.7).setDepth(12);
+    // ── 4. Secondary ripple ring (crit only — double ring) ──────
+    if (isCrit) {
+      const ring2 = this.add.graphics().setDepth(11);
+      ring2.lineStyle(2, 0xffdd44, 0.6);
+      ring2.strokeCircle(0, 0, 4);
+      ring2.setPosition(hitX, hitY);
+      this.effectLayer.add(ring2);
+      animate(ring2, { scaleX: 9, scaleY: 9, alpha: 0, duration: 500, delay: 60, easing: "easeOutCubic", onComplete: () => ring2.destroy() });
+    }
+
+    // ── 5. Impact flash burst ───────────────────────────────────
+    const flash = this.add.graphics().setDepth(13);
+    flash.fillStyle(isCrit ? 0xff9933 : 0xffffff, 0.9);
+    flash.fillCircle(0, 0, isCrit ? 12 : 7);
+    // Inner bright core
+    flash.fillStyle(0xffffff, 1);
+    flash.fillCircle(0, 0, isCrit ? 5 : 3);
+    flash.setPosition(hitX, hitY);
     this.effectLayer.add(flash);
-    animate(flash, { scaleX: 2.5, scaleY: 2.5, alpha: 0, duration: 160, easing: "easeOutQuad", onComplete: () => flash.destroy() });
+    animate(flash, {
+      scaleX: isCrit ? 3.5 : 2.2, scaleY: isCrit ? 3.5 : 2.2,
+      alpha: 0,
+      duration: isCrit ? 220 : 150,
+      easing: "easeOutExpo",
+      onComplete: () => flash.destroy(),
+    });
 
-    // ── Sparks radiating outward ────────────────────────────
-    const sparkColors = [0xffffff, 0xffdd44, 0xff6644, 0xffaa22];
-    for (let i = 0; i < 7; i++) {
-      const sparkAngle = perpAngle + (Math.random() - 0.5) * 2.5;
-      const sparkDist = Phaser.Math.Between(10, 24);
-      const sz = Phaser.Math.FloatBetween(1, 2.5);
-      const spark = this.add.circle(hitX, hitY, sz, sparkColors[i % sparkColors.length], 0.9).setDepth(11);
+    // ── 6. Sparks fanning outward from impact ───────────────────
+    const sparkColors = isCrit
+      ? [0xffffff, 0xff8800, 0xffdd44, 0xff4400, 0xffcc00]
+      : [0xffffff, 0xaaddff, 0x88ccff, 0xffdd88];
+    const numSparks = isCrit ? 12 : 7;
+    for (let i = 0; i < numSparks; i++) {
+      // Fan sparks around perp angle so they radiate from slash
+      const spreadAngle = perp + (Math.PI / (numSparks - 1)) * i - Math.PI / 2;
+      const dist = Phaser.Math.Between(isCrit ? 16 : 8, isCrit ? 36 : 22);
+      const sz = Phaser.Math.FloatBetween(isCrit ? 1.5 : 0.8, isCrit ? 3 : 1.8);
+      const spark = this.add.circle(hitX, hitY, sz, sparkColors[i % sparkColors.length], 1).setDepth(12);
       this.effectLayer.add(spark);
       animate(spark, {
-        x: hitX + Math.cos(sparkAngle) * sparkDist,
-        y: hitY + Math.sin(sparkAngle) * sparkDist - Phaser.Math.Between(2, 8),
-        alpha: 0, scaleX: 0.1, scaleY: 0.1,
-        duration: Phaser.Math.Between(180, 380),
+        x: hitX + Math.cos(spreadAngle) * dist,
+        y: hitY + Math.sin(spreadAngle) * dist - Phaser.Math.Between(3, 12),
+        alpha: 0,
+        scaleX: 0.1, scaleY: 0.1,
+        duration: Phaser.Math.Between(200, isCrit ? 500 : 350),
+        delay: Phaser.Math.Between(0, 60),
         easing: "easeOutCubic",
         onComplete: () => spark.destroy(),
       });
+    }
+
+    // ── 7. Ground impact mark — brief dark ellipse ──────────────
+    if (isCrit) {
+      const mark = this.add.graphics().setDepth(9).setAlpha(0.5);
+      mark.fillStyle(0x000000, 1);
+      mark.fillEllipse(hitX, hitY + 4, 20, 8);
+      this.effectLayer.add(mark);
+      animate(mark, { alpha: 0, scaleX: 2, duration: 600, easing: "easeOutQuad", onComplete: () => mark.destroy() });
     }
   }
 
