@@ -9,32 +9,40 @@ import type { GameWebSocket, PlayerState } from "../ws";
 
 // ── Visual Config ──────────────────────────────────────────
 
-const CLASS_CONFIG: Record<string, { color: number; accent: number; icon: string; glow: number; charFrame: number; ringColor: number }> = {
-  Warrior:     { color: 0xdd6644, accent: 0xaa3322, icon: "\u2694", glow: 0xff6633, charFrame: 0,   ringColor: 0xff4422 },
-  Mage:        { color: 0x8877ff, accent: 0x5544cc, icon: "\u2726", glow: 0xaa99ff, charFrame: 109, ringColor: 0x9977ff },
-  Ranger:      { color: 0x55cc55, accent: 0x338833, icon: "\u2192", glow: 0x77ee77, charFrame: 54,  ringColor: 0x44cc44 },
-  Cleric:      { color: 0xffcc33, accent: 0xcc9922, icon: "\u271A", glow: 0xffee66, charFrame: 163, ringColor: 0xeecc44 },
-  Rogue:       { color: 0xee55aa, accent: 0xbb2277, icon: "\u2020", glow: 0xff77cc, charFrame: 216, ringColor: 0xdd44aa },
-  Paladin:     { color: 0x44aaff, accent: 0x2277cc, icon: "\u2666", glow: 0x66ccff, charFrame: 2,   ringColor: 0x3399ff },
-  Necromancer: { color: 0xbb44ee, accent: 0x7722bb, icon: "\u2620", glow: 0xdd66ff, charFrame: 111, ringColor: 0xaa33dd },
-  Druid:       { color: 0x44ddaa, accent: 0x228866, icon: "\u2618", glow: 0x66ffcc, charFrame: 55,  ringColor: 0x33ccaa },
+const CLASS_CONFIG: Record<string, {
+  color: number; accent: number; dark: number; skin: number;
+  glow: number; ringColor: number;
+  armorShape: "heavy" | "robe" | "leather" | "plate";
+  helmetStyle: "horned" | "hood" | "cap" | "crown" | "none";
+  weaponStyle: "sword" | "staff" | "bow" | "mace" | "dagger" | "shield" | "scythe" | "leaf";
+}> = {
+  Warrior:     { color: 0xcc4422, accent: 0x992211, dark: 0x661100, skin: 0xf0c8a0, glow: 0xff6633, ringColor: 0xff4422, armorShape: "heavy",   helmetStyle: "horned",  weaponStyle: "sword"  },
+  Mage:        { color: 0x6655dd, accent: 0x4433aa, dark: 0x221166, skin: 0xe8d0f8, glow: 0xaa99ff, ringColor: 0x9977ff, armorShape: "robe",    helmetStyle: "hood",    weaponStyle: "staff"  },
+  Ranger:      { color: 0x338833, accent: 0x226622, dark: 0x114411, skin: 0xd8c898, glow: 0x77ee77, ringColor: 0x44cc44, armorShape: "leather", helmetStyle: "cap",     weaponStyle: "bow"    },
+  Cleric:      { color: 0xccaa22, accent: 0x997711, dark: 0x664400, skin: 0xf4ddb0, glow: 0xffee66, ringColor: 0xeecc44, armorShape: "robe",    helmetStyle: "crown",   weaponStyle: "mace"   },
+  Rogue:       { color: 0x993388, accent: 0x662255, dark: 0x330033, skin: 0xddb898, glow: 0xff77cc, ringColor: 0xdd44aa, armorShape: "leather", helmetStyle: "none",    weaponStyle: "dagger" },
+  Paladin:     { color: 0x2266cc, accent: 0x114499, dark: 0x002266, skin: 0xf0d8c0, glow: 0x66ccff, ringColor: 0x3399ff, armorShape: "plate",   helmetStyle: "horned",  weaponStyle: "shield" },
+  Necromancer: { color: 0x8822cc, accent: 0x5511aa, dark: 0x220044, skin: 0xccbbee, glow: 0xdd66ff, ringColor: 0xaa33dd, armorShape: "robe",    helmetStyle: "hood",    weaponStyle: "scythe" },
+  Druid:       { color: 0x228866, accent: 0x116644, dark: 0x003322, skin: 0xd4c890, glow: 0x66ffcc, ringColor: 0x33ccaa, armorShape: "leather", helmetStyle: "none",    weaponStyle: "leaf"   },
 };
 
-const MOB_CONFIG: Record<string, { color: number; size: number; shape: string }> = {
-  giant_rat:      { color: 0x886644, size: 5,  shape: "circle" },
-  young_wolf:     { color: 0x8899aa, size: 6,  shape: "circle" },
-  wild_boar:      { color: 0x886644, size: 7,  shape: "hex" },
-  goblin_scout:   { color: 0x66aa44, size: 6,  shape: "circle" },
-  green_slime:    { color: 0x44dd44, size: 6,  shape: "blob" },
-  bandit:         { color: 0xaa7744, size: 7,  shape: "hex" },
-  alpha_wolf:     { color: 0xbbbbcc, size: 8,  shape: "circle" },
-  brown_bear:     { color: 0x885533, size: 10, shape: "hex" },
-  giant_spider:   { color: 0x554466, size: 8,  shape: "circle" },
-  orc_warrior:    { color: 0x558833, size: 9,  shape: "hex" },
-  harpy:          { color: 0x9966aa, size: 7,  shape: "circle" },
-  shadow_stalker: { color: 0x334455, size: 8,  shape: "hex" },
-  dark_knight:    { color: 0x333344, size: 10, shape: "hex" },
-  necromancer:    { color: 0x774499, size: 9,  shape: "circle" },
+type MobShape = "rat" | "wolf" | "boar" | "goblin" | "slime" | "bandit" | "bear" | "spider" | "orc" | "harpy" | "shadow" | "knight" | "necro";
+
+const MOB_CONFIG: Record<string, { color: number; accent: number; dark: number; size: number; shape: MobShape }> = {
+  giant_rat:      { color: 0x997755, accent: 0x775533, dark: 0x553311, size: 8,  shape: "rat"     },
+  young_wolf:     { color: 0x9aabb8, accent: 0x6688aa, dark: 0x334455, size: 10, shape: "wolf"    },
+  wild_boar:      { color: 0x7a5530, accent: 0x553322, dark: 0x331100, size: 12, shape: "boar"    },
+  goblin_scout:   { color: 0x5aaa33, accent: 0x336611, dark: 0x224400, size: 9,  shape: "goblin"  },
+  green_slime:    { color: 0x33dd44, accent: 0x22aa33, dark: 0x117722, size: 10, shape: "slime"   },
+  bandit:         { color: 0xaa8855, accent: 0x775533, dark: 0x442211, size: 11, shape: "bandit"  },
+  alpha_wolf:     { color: 0xdde0ee, accent: 0xaab0cc, dark: 0x445566, size: 13, shape: "wolf"    },
+  brown_bear:     { color: 0x884422, accent: 0x663311, dark: 0x331100, size: 16, shape: "bear"    },
+  giant_spider:   { color: 0x553366, accent: 0x441155, dark: 0x220033, size: 12, shape: "spider"  },
+  orc_warrior:    { color: 0x44882a, accent: 0x336611, dark: 0x114400, size: 14, shape: "orc"     },
+  harpy:          { color: 0x997acc, accent: 0x775599, dark: 0x443366, size: 11, shape: "harpy"   },
+  shadow_stalker: { color: 0x445566, accent: 0x223344, dark: 0x112233, size: 12, shape: "shadow"  },
+  dark_knight:    { color: 0x2a2a3a, accent: 0x1a1a2a, dark: 0x0a0a11, size: 15, shape: "knight"  },
+  necromancer:    { color: 0x7733aa, accent: 0x552288, dark: 0x220044, size: 13, shape: "necro"   },
 };
 
 const ZONE_PALETTE: Record<string, { bg: number; grass1: number; grass2: number; grass3: number; detail: number; path: number; pathEdge: number; trees: boolean; tint: number; ambient: number }> = {
@@ -753,10 +761,10 @@ export class GameScene extends Phaser.Scene {
     const dy = ty - s.y;
     const moved = Math.abs(dx) > 2 || Math.abs(dy) > 2;
 
-    // Flip sprite to face movement direction
+    // Flip body to face movement direction (3.5× scale preserved)
     if (Math.abs(dx) > 4) {
-      const target = s.sprite || s.body;
-      target.setScale(dx < 0 ? -Math.abs(target.scaleX) : Math.abs(target.scaleX), target.scaleY);
+      const absX = Math.abs(s.body.scaleX);
+      s.body.setScale(dx < 0 ? -absX : absX, s.body.scaleY);
     }
 
     if (moved) {
@@ -829,135 +837,373 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Draw a pixel-art RPG character body onto a Graphics object.
+   *  All coords are at 1px scale — container handles display scale.
+   *  Origin assumed at (0, 0) = bottom-center of feet. */
+  private drawCharBody(g: Phaser.GameObjects.Graphics, cfg: typeof CLASS_CONFIG[string]) {
+    const { color, accent, dark, skin, glow, armorShape, helmetStyle, weaponStyle } = cfg;
+    const hi = 0xffffff;
+
+    // ── Feet / shoes ────────────────────────────────────────
+    g.fillStyle(dark, 1);
+    g.fillRect(-4, -4, 3, 4);
+    g.fillRect(1, -4, 3, 4);
+    // Shoe highlight
+    g.fillStyle(accent, 0.6);
+    g.fillRect(-4, -4, 3, 1);
+    g.fillRect(1, -4, 3, 1);
+
+    // ── Legs ─────────────────────────────────────────────────
+    const legColor = armorShape === "robe" ? accent : dark;
+    g.fillStyle(legColor, 1);
+    g.fillRect(-3, -12, 2, 8);
+    g.fillRect(1, -12, 2, 8);
+    // Leg highlight (inner edge)
+    g.fillStyle(color, 0.35);
+    g.fillRect(-2, -12, 1, 7);
+    g.fillRect(1, -12, 1, 7);
+
+    // ── Robe / skirt hem (mage / cleric) ─────────────────────
+    if (armorShape === "robe") {
+      g.fillStyle(color, 1);
+      g.fillRect(-5, -14, 10, 6);
+      g.fillStyle(accent, 0.6);
+      g.fillRect(-5, -14, 10, 1);
+      // Robe trim
+      g.fillStyle(0xffdd88, 0.4);
+      g.fillRect(-5, -9, 10, 1);
+    }
+
+    // ── Torso (class-specific shape) ─────────────────────────
+    const torsoTop = armorShape === "robe" ? -26 : -24;
+    const torsoH   = armorShape === "robe" ? 12 : 12;
+
+    g.fillStyle(color, 1);
+    g.fillRect(-6, torsoTop, 12, torsoH);
+
+    // Armor highlight — top band
+    g.fillStyle(hi, 0.18);
+    g.fillRect(-5, torsoTop + 1, 10, 2);
+
+    // Armor shadow — bottom band
+    g.fillStyle(dark, 0.5);
+    g.fillRect(-5, torsoTop + torsoH - 3, 10, 2);
+
+    // Center chest detail
+    g.fillStyle(glow, 0.45);
+    g.fillRect(-1, torsoTop + 3, 2, 4);
+
+    // Heavy armor: pauldrons (spiky/wide shoulders)
+    if (armorShape === "heavy" || armorShape === "plate") {
+      g.fillStyle(accent, 1);
+      g.fillRect(-9, torsoTop, 3, 5);    // left shoulder
+      g.fillRect(6, torsoTop, 3, 5);     // right shoulder
+      g.fillStyle(hi, 0.25);
+      g.fillRect(-9, torsoTop, 3, 1);
+      g.fillRect(6, torsoTop, 3, 1);
+      // Plate: extra decorative band
+      if (armorShape === "plate") {
+        g.fillStyle(0xaaccff, 0.3);
+        g.fillRect(-6, torsoTop + 5, 12, 1);
+      }
+    } else if (armorShape === "leather") {
+      // Leather: angled strap
+      g.fillStyle(dark, 0.55);
+      g.fillRect(-5, torsoTop + 4, 10, 1);
+      g.fillRect(-5, torsoTop + 7, 10, 1);
+    }
+
+    // ── Head ─────────────────────────────────────────────────
+    const headY = torsoTop - 10;
+    g.fillStyle(skin, 1);
+    g.fillRect(-5, headY, 10, 9);
+    // Head shadow (chin)
+    g.fillStyle(dark, 0.12);
+    g.fillRect(-5, headY + 7, 10, 2);
+    // Ear nubs
+    g.fillStyle(skin, 1);
+    g.fillRect(-6, headY + 2, 1, 3);
+    g.fillRect(5, headY + 2, 1, 3);
+
+    // Eyes — large, expressive pixel-art style
+    const eyeY = headY + 3;
+    g.fillStyle(0x1a1020, 1);
+    g.fillRect(-3, eyeY, 2, 3);      // left eye socket
+    g.fillRect(1, eyeY, 2, 3);       // right eye socket
+    // Iris — class glow color
+    g.fillStyle(glow, 0.9);
+    g.fillRect(-3, eyeY, 2, 2);
+    g.fillRect(1, eyeY, 2, 2);
+    // Eye shine
+    g.fillStyle(hi, 0.95);
+    g.fillRect(-3, eyeY, 1, 1);
+    g.fillRect(1, eyeY, 1, 1);
+    // Brow
+    g.fillStyle(dark, 0.7);
+    g.fillRect(-3, eyeY - 1, 2, 1);
+    g.fillRect(1, eyeY - 1, 2, 1);
+
+    // Mouth — tiny
+    g.fillStyle(dark, 0.5);
+    g.fillRect(-1, headY + 7, 2, 1);
+
+    // ── Helmet / hair ────────────────────────────────────────
+    const helmetY = headY - 3;
+    if (helmetStyle === "horned") {
+      // Full helm — covers head
+      g.fillStyle(accent, 1);
+      g.fillRect(-5, helmetY, 10, 6);
+      g.fillStyle(hi, 0.2);
+      g.fillRect(-5, helmetY, 10, 1);
+      // Visor strip
+      g.fillStyle(dark, 0.7);
+      g.fillRect(-4, helmetY + 2, 8, 2);
+      g.fillStyle(glow, 0.4);
+      g.fillRect(-4, helmetY + 2, 8, 1);
+      // Horns
+      g.fillStyle(color, 1);
+      g.fillRect(-7, helmetY - 3, 2, 4);
+      g.fillRect(5, helmetY - 3, 2, 4);
+      g.fillStyle(hi, 0.3);
+      g.fillRect(-7, helmetY - 3, 1, 4);
+      g.fillRect(5, helmetY - 3, 1, 4);
+    } else if (helmetStyle === "hood") {
+      // Flowing hood
+      g.fillStyle(dark, 1);
+      g.fillRect(-6, helmetY - 1, 12, 8);
+      g.fillStyle(accent, 0.7);
+      g.fillRect(-5, helmetY, 10, 6);
+      // Inner shadow frame
+      g.fillStyle(dark, 0.8);
+      g.fillRect(-4, helmetY + 1, 8, 5);
+      // Face cutout (skin shows through)
+      g.fillStyle(skin, 1);
+      g.fillRect(-3, headY, 6, 7);
+      // Redraw eyes on top
+      g.fillStyle(0x1a1020, 1);
+      g.fillRect(-3, eyeY, 2, 3);
+      g.fillRect(1, eyeY, 2, 3);
+      g.fillStyle(glow, 0.9);
+      g.fillRect(-3, eyeY, 2, 2);
+      g.fillRect(1, eyeY, 2, 2);
+      g.fillStyle(hi, 0.95);
+      g.fillRect(-3, eyeY, 1, 1);
+      g.fillRect(1, eyeY, 1, 1);
+    } else if (helmetStyle === "cap") {
+      // Ranger cap with brim
+      g.fillStyle(color, 1);
+      g.fillRect(-5, helmetY, 10, 4);
+      g.fillRect(-7, helmetY + 3, 14, 2);  // brim
+      g.fillStyle(hi, 0.2);
+      g.fillRect(-5, helmetY, 10, 1);
+      // Feather
+      g.fillStyle(0xffdd88, 0.8);
+      g.fillRect(4, helmetY - 3, 2, 5);
+      g.fillStyle(0xff9944, 0.6);
+      g.fillRect(4, helmetY - 3, 1, 4);
+    } else if (helmetStyle === "crown") {
+      // Cleric halo / crown
+      g.fillStyle(0xffdd44, 1);
+      g.fillRect(-5, helmetY + 1, 10, 2);   // crown band
+      // Crown points
+      g.fillRect(-4, helmetY - 2, 2, 3);
+      g.fillRect(-1, helmetY - 3, 2, 4);
+      g.fillRect(2, helmetY - 2, 2, 3);
+      // Gems
+      g.fillStyle(0xffffff, 0.9);
+      g.fillRect(-3, helmetY - 1, 1, 1);
+      g.fillRect(0, helmetY - 2, 1, 1);
+      g.fillRect(2, helmetY - 1, 1, 1);
+    } else {
+      // No helmet — hair
+      g.fillStyle(dark, 1);
+      g.fillRect(-5, helmetY, 10, 4);
+      // Hair highlight
+      g.fillStyle(color, 0.4);
+      g.fillRect(-4, helmetY, 8, 2);
+    }
+
+    // ── Weapon / offhand ─────────────────────────────────────
+    const weapX = 7;
+    const weapY = torsoTop + 2;
+
+    if (weaponStyle === "sword") {
+      // Blade
+      g.fillStyle(0xddddee, 1);
+      g.fillRect(weapX, weapY - 8, 2, 12);
+      g.fillStyle(hi, 0.8);
+      g.fillRect(weapX, weapY - 8, 1, 12);
+      // Guard
+      g.fillStyle(accent, 1);
+      g.fillRect(weapX - 2, weapY + 3, 6, 2);
+      // Grip
+      g.fillStyle(dark, 1);
+      g.fillRect(weapX, weapY + 5, 2, 4);
+    } else if (weaponStyle === "staff") {
+      // Long staff
+      g.fillStyle(0xaa8844, 1);
+      g.fillRect(weapX, weapY - 14, 2, 20);
+      g.fillStyle(hi, 0.4);
+      g.fillRect(weapX, weapY - 14, 1, 20);
+      // Orb on top
+      g.fillStyle(glow, 0.9);
+      g.fillRect(weapX - 2, weapY - 17, 6, 5);
+      g.fillStyle(hi, 0.6);
+      g.fillRect(weapX - 1, weapY - 16, 2, 2);
+    } else if (weaponStyle === "bow") {
+      // Bow curve (left side)
+      g.fillStyle(0x996633, 1);
+      g.fillRect(-9, weapY - 8, 2, 16);  // left stave
+      // Bowstring
+      g.lineStyle(1, 0xeeeecc, 0.8);
+      g.lineBetween(-8, weapY - 8, -8, weapY + 8);
+      // Arrow nocked
+      g.fillStyle(0xddccaa, 1);
+      g.fillRect(-8, weapY - 1, 8, 1);
+      g.fillStyle(0xdd4422, 0.9);
+      g.fillRect(-8, weapY - 2, 2, 3);  // fletching
+    } else if (weaponStyle === "mace") {
+      // Handle
+      g.fillStyle(0x887755, 1);
+      g.fillRect(weapX, weapY - 4, 2, 10);
+      // Head
+      g.fillStyle(0xddccaa, 1);
+      g.fillRect(weapX - 3, weapY - 9, 8, 6);
+      // Spikes
+      g.fillStyle(hi, 0.9);
+      g.fillRect(weapX - 4, weapY - 8, 1, 4);
+      g.fillRect(weapX + 6, weapY - 8, 1, 4);
+      g.fillRect(weapX, weapY - 10, 2, 1);
+    } else if (weaponStyle === "dagger") {
+      // Short blade (both hands)
+      g.fillStyle(0xccccdd, 1);
+      g.fillRect(weapX, weapY - 4, 2, 8);
+      g.fillRect(-9, weapY - 4, 2, 8);
+      g.fillStyle(hi, 0.7);
+      g.fillRect(weapX, weapY - 4, 1, 8);
+      g.fillRect(-9, weapY - 4, 1, 8);
+      // Guards
+      g.fillStyle(0x886644, 1);
+      g.fillRect(weapX - 1, weapY + 3, 4, 2);
+      g.fillRect(-10, weapY + 3, 4, 2);
+    } else if (weaponStyle === "shield") {
+      // Shield (offhand left)
+      g.fillStyle(accent, 1);
+      g.fillRect(-11, weapY - 6, 5, 10);
+      g.fillStyle(color, 1);
+      g.fillRect(-10, weapY - 5, 3, 8);
+      g.fillStyle(hi, 0.3);
+      g.fillRect(-10, weapY - 5, 1, 8);
+      // Boss
+      g.fillStyle(0xddcc88, 0.9);
+      g.fillRect(-9, weapY - 1, 1, 2);
+      // Sword
+      g.fillStyle(0xddddee, 1);
+      g.fillRect(weapX, weapY - 8, 2, 12);
+      g.fillStyle(accent, 1);
+      g.fillRect(weapX - 2, weapY + 3, 6, 2);
+    } else if (weaponStyle === "scythe") {
+      // Long handle
+      g.fillStyle(0x554433, 1);
+      g.fillRect(weapX, weapY - 14, 2, 20);
+      // Blade — angled hook
+      g.fillStyle(0x9999bb, 1);
+      g.fillRect(weapX - 6, weapY - 16, 8, 3);
+      g.fillRect(weapX - 7, weapY - 13, 3, 4);
+      g.fillStyle(hi, 0.5);
+      g.fillRect(weapX - 6, weapY - 16, 8, 1);
+    } else if (weaponStyle === "leaf") {
+      // Living branch / leaf wand
+      g.fillStyle(0x558844, 1);
+      g.fillRect(weapX, weapY - 12, 2, 18);
+      // Leaves
+      g.fillStyle(0x44cc55, 0.9);
+      g.fillRect(weapX - 3, weapY - 14, 4, 4);
+      g.fillRect(weapX + 1, weapY - 12, 4, 4);
+      g.fillRect(weapX - 2, weapY - 10, 3, 3);
+      g.fillStyle(0x88ff99, 0.4);
+      g.fillRect(weapX - 2, weapY - 13, 2, 2);
+    }
+  }
+
   private mkAgent(name: string, cls: string): AgentSprite {
     const cfg = CLASS_CONFIG[cls] || CLASS_CONFIG.Warrior;
+    // Scale factor: pixel-art units → screen pixels. 3.5× makes 32px chars read well.
+    const SC = 3.5;
     const c = this.add.container(100, 100);
 
     // ── Outer glow ring (pulsing halo) ──────────────────────
-    const glowRing = this.add.circle(0, 0, 22, cfg.ringColor, 0.0);
+    const glowRing = this.add.circle(0, 0, 26, cfg.ringColor, 0.0);
     c.add(glowRing);
 
-    // ── Ground shadow (elongated ellipse) ───────────────────
-    c.add(this.add.ellipse(0, 16, 22, 7, 0x000000, 0.35));
+    // ── Ground shadow ────────────────────────────────────────
+    c.add(this.add.ellipse(0, 18, 28, 9, 0x000000, 0.35));
 
-    // ── Class ambient glow disc ─────────────────────────────
-    c.add(this.add.circle(0, 0, 18, cfg.glow, 0.10));
+    // ── Class ambient glow disc ──────────────────────────────
+    c.add(this.add.circle(0, -8, 20, cfg.glow, 0.08));
 
-    // ── Sprite or graphic body ──────────────────────────────
-    let sprite: Phaser.GameObjects.Image | null = null;
+    // ── Pixel-art character body ─────────────────────────────
     const body = this.add.graphics();
+    body.setScale(SC);
+    // The pixel art is drawn at 1px coords, then scaled — origin offset so feet = y:0
+    this.drawCharBody(body, cfg);
+    c.add(body);
+    const sprite: Phaser.GameObjects.Image | null = null; // always graphics now
 
-    if (this.hasCharSprites) {
-      try {
-        sprite = this.add.image(0, -4, "chars", cfg.charFrame).setScale(2.0);
-        sprite.setTint(cfg.color);
-        c.add(sprite);
-      } catch { sprite = null; }
-    }
-
-    if (!sprite) {
-      // High-quality graphic fallback — multi-layer character
-      // Legs
-      body.fillStyle(cfg.accent, 1);
-      body.fillRoundedRect(-5, 5, 4, 10, 2);
-      body.fillRoundedRect(1, 5, 4, 10, 2);
-
-      // Body armor plate
-      body.fillStyle(cfg.color, 1);
-      body.fillRoundedRect(-8, -8, 16, 14, 3);
-      // Armor highlight
-      body.fillStyle(0xffffff, 0.18);
-      body.fillRoundedRect(-7, -7, 14, 5, 2);
-      // Armor shadow
-      body.fillStyle(cfg.accent, 0.4);
-      body.fillRoundedRect(-7, 2, 14, 4, 2);
-
-      // Shoulder pads
-      body.fillStyle(cfg.accent, 1);
-      body.fillCircle(-9, -4, 3);
-      body.fillCircle(9, -4, 3);
-      body.fillStyle(cfg.color, 0.6);
-      body.fillCircle(-9, -5, 2);
-      body.fillCircle(9, -5, 2);
-
-      // Head
-      body.fillStyle(0xf0ddcc, 1);
-      body.fillCircle(0, -14, 6);
-      // Eyes
-      body.fillStyle(0x1a1a2a, 1);
-      body.fillCircle(-2, -15, 1.2);
-      body.fillCircle(2, -15, 1.2);
-      // Eye glow for class
-      body.fillStyle(cfg.glow, 0.8);
-      body.fillCircle(-2, -15, 0.6);
-      body.fillCircle(2, -15, 0.6);
-
-      // Helmet/hair
-      body.fillStyle(cfg.accent, 1);
-      body.fillRoundedRect(-5, -20, 10, 7, 2);
-      body.fillStyle(cfg.color, 0.5);
-      body.fillRect(-4, -19, 8, 2);
-
-      // Class icon badge on chest
-      c.add(this.add.text(0, -2, cfg.icon, {
-        fontSize: "9px", color: hexStr(cfg.glow), fontFamily: "Arial",
-      }).setOrigin(0.5).setAlpha(0.95));
-
-      c.add(body);
-    }
-
-    // ── HP bar (wider, cleaner) ──────────────────────────────
+    // ── HP bar ───────────────────────────────────────────────
     const hpBar = this.add.graphics();
     c.add(hpBar);
-    this.drawHpBar(hpBar, 100, 100, 32, -24);
+    this.drawHpBar(hpBar, 100, 100, 36, -26);
 
-    // ── Name plate with class color accent ──────────────────
+    // ── Name plate ───────────────────────────────────────────
     const nameBg = this.add.graphics();
-    nameBg.fillStyle(0x000000, 0.55);
-    nameBg.fillRoundedRect(-name.length * 3.5 - 4, -35, name.length * 7 + 8, 11, 3);
+    const nbW = name.length * 5.5 + 10;
+    nameBg.fillStyle(0x000000, 0.6);
+    nameBg.fillRoundedRect(-nbW / 2, -40, nbW, 12, 3);
+    nameBg.lineStyle(1, cfg.color, 0.4);
+    nameBg.strokeRoundedRect(-nbW / 2, -40, nbW, 12, 3);
     c.add(nameBg);
 
-    const nameLabel = this.add.text(0, -30, name, {
-      fontSize: "10px", color: hexStr(cfg.glow), fontFamily: "'Segoe UI', Arial, sans-serif",
+    const nameLabel = this.add.text(0, -34, name, {
+      fontSize: "9px", color: hexStr(cfg.glow), fontFamily: "'Segoe UI', Arial, sans-serif",
       fontStyle: "bold",
-    }).setOrigin(0.5, 1);
+    }).setOrigin(0.5, 0.5);
     c.add(nameLabel);
 
-    // ── Level badge ─────────────────────────────────────────
-    const levelLabel = this.add.text(20, -23, "Lv1", {
+    // ── Level badge ──────────────────────────────────────────
+    const levelLabel = this.add.text(nbW / 2 + 3, -34, "Lv1", {
       fontSize: "8px", color: "#ffdd44", fontFamily: "Arial",
       stroke: "#000000", strokeThickness: 2,
     }).setOrigin(0, 0.5);
     c.add(levelLabel);
 
-    // ── Action text ─────────────────────────────────────────
+    // ── Action text ──────────────────────────────────────────
     const actionLabel = this.add.text(0, 24, "", {
-      fontSize: "8px", color: "#5a7a8a", fontFamily: "Arial",
+      fontSize: "8px", color: "#7a9aaa", fontFamily: "Arial",
       stroke: "#000000", strokeThickness: 2,
     }).setOrigin(0.5, 0);
     c.add(actionLabel);
 
-    // ── Status icon ─────────────────────────────────────────
-    const statusIcon = this.add.text(0, -44, "", {
-      fontSize: "16px", color: "#ffffff", fontFamily: "Arial",
+    // ── Status icon ──────────────────────────────────────────
+    const statusIcon = this.add.text(0, -52, "", {
+      fontSize: "14px", color: "#ffffff", fontFamily: "Arial",
       stroke: "#000000", strokeThickness: 3,
     }).setOrigin(0.5, 1).setAlpha(0);
     c.add(statusIcon);
 
-    // ── Click to follow ─────────────────────────────────────
-    const hit = this.add.rectangle(0, 0, 32, 42, 0xffffff, 0).setInteractive();
+    // ── Click to follow ──────────────────────────────────────
+    const hit = this.add.rectangle(0, -8, 36, 50, 0xffffff, 0).setInteractive();
     c.add(hit);
     hit.on("pointerdown", () => this.cam.startFollow(c, true, 0.08, 0.08));
-    hit.on("pointerover", () => { glowRing.setAlpha(0.15); });
+    hit.on("pointerover", () => { glowRing.setAlpha(0.18); });
     hit.on("pointerout",  () => { glowRing.setAlpha(0.0); });
 
-    // ── Idle breathing + glow pulse via anime.js ─────────────
-    const breathTarget = sprite || body;
-    idleBreathe(breathTarget, breathTarget.scaleX, breathTarget.scaleY);
+    // ── Idle breathing on body ───────────────────────────────
+    idleBreathe(body, body.scaleX, body.scaleY);
 
     // Glow ring pulse
     (function pulseRing() {
-      animate(glowRing, { alpha: 0.12, duration: 1800, easing: "easeInOutSine",
+      animate(glowRing, { alpha: 0.10, duration: 1800, easing: "easeInOutSine",
         onComplete: () => animate(glowRing, { alpha: 0.0, duration: 1800, easing: "easeInOutSine", onComplete: pulseRing }) });
     })();
 
@@ -966,6 +1212,670 @@ export class GameScene extends Phaser.Scene {
       cls, x: 100, y: 100, lastHp: 100, lastMaxHp: 100,
       isMoving: false, currentAction: "",
     };
+  }
+
+  /** Draw a distinct pixel-art mob body. Each shape is a unique silhouette. */
+  private drawMobBody(g: Phaser.GameObjects.Graphics, cfg: typeof MOB_CONFIG[string]) {
+    const { color, accent, dark } = cfg;
+    const hi = 0xffffff;
+
+    switch (cfg.shape) {
+      case "rat": {
+        // Hunched rodent — big round body, long snout, tail
+        const s = cfg.size;
+        // Body (large ovoid, hunched forward)
+        g.fillStyle(dark, 1);
+        g.fillEllipse(1, 1, s * 2.2, s * 1.6);
+        g.fillStyle(color, 1);
+        g.fillEllipse(0, 0, s * 2.2, s * 1.6);
+        // Fur highlight
+        g.fillStyle(hi, 0.15);
+        g.fillEllipse(-s * 0.3, -s * 0.4, s * 0.9, s * 0.6);
+        // Head (smaller, pushed forward)
+        g.fillStyle(dark, 1);
+        g.fillEllipse(s * 0.7, -s * 0.3, s, s * 0.9);
+        g.fillStyle(color, 1);
+        g.fillEllipse(s * 0.6, -s * 0.4, s, s * 0.9);
+        // Snout
+        g.fillStyle(accent, 1);
+        g.fillEllipse(s * 1.1, -s * 0.3, s * 0.5, s * 0.35);
+        g.fillStyle(0xffaaaa, 0.9);
+        g.fillCircle(s * 1.25, -s * 0.32, s * 0.12);
+        // Eye
+        g.fillStyle(0xff3300, 1);
+        g.fillCircle(s * 0.85, -s * 0.55, s * 0.18);
+        g.fillStyle(hi, 0.9);
+        g.fillCircle(s * 0.88, -s * 0.58, s * 0.07);
+        // Ear
+        g.fillStyle(color, 1);
+        g.fillEllipse(s * 0.55, -s * 0.8, s * 0.35, s * 0.5);
+        g.fillStyle(0xffcccc, 0.5);
+        g.fillEllipse(s * 0.55, -s * 0.82, s * 0.22, s * 0.35);
+        // Tail (curved line)
+        g.lineStyle(s * 0.18, accent, 0.8);
+        g.beginPath();
+        g.moveTo(-s * 0.9, 0);
+        g.lineTo(-s * 1.4, s * 0.4);
+        g.strokePath();
+        // Feet
+        g.fillStyle(dark, 0.8);
+        g.fillEllipse(-s * 0.3, s * 0.65, s * 0.4, s * 0.22);
+        g.fillEllipse(s * 0.3, s * 0.65, s * 0.4, s * 0.22);
+        break;
+      }
+      case "wolf": {
+        const s = cfg.size;
+        // Body — sleek, angular
+        g.fillStyle(dark, 1);
+        g.fillEllipse(1, 2, s * 2, s * 1.2);
+        g.fillStyle(color, 1);
+        g.fillEllipse(0, 0, s * 2, s * 1.2);
+        // Back fur stripe
+        g.fillStyle(dark, 0.55);
+        g.fillRect(-s * 0.6, -s * 0.6, s * 1.2, s * 0.25);
+        // Neck / head
+        g.fillStyle(color, 1);
+        g.fillRect(s * 0.4, -s * 0.7, s * 0.7, s * 0.6);
+        // Snout (angular, wolf-like)
+        g.fillStyle(accent, 1);
+        g.fillRect(s * 0.9, -s * 0.55, s * 0.6, s * 0.35);
+        g.fillStyle(dark, 0.4);
+        g.fillRect(s * 0.9, -s * 0.55, s * 0.6, s * 0.12);
+        // Nose
+        g.fillStyle(0x111111, 1);
+        g.fillRect(s * 1.4, -s * 0.45, s * 0.15, s * 0.12);
+        // Eyes — slit pupils
+        g.fillStyle(0xffcc00, 1);
+        g.fillRect(s * 0.72, -s * 0.72, s * 0.22, s * 0.18);
+        g.fillStyle(0x220000, 1);
+        g.fillRect(s * 0.78, -s * 0.72, s * 0.08, s * 0.18);
+        // Ears (pointed)
+        g.fillStyle(color, 1);
+        const ear = [new Phaser.Math.Vector2(s * 0.5, -s * 0.8), new Phaser.Math.Vector2(s * 0.65, -s * 1.3), new Phaser.Math.Vector2(s * 0.8, -s * 0.75)];
+        g.fillPoints(ear, true);
+        const ear2 = [new Phaser.Math.Vector2(s * 0.85, -s * 0.78), new Phaser.Math.Vector2(s * 1.0, -s * 1.2), new Phaser.Math.Vector2(s * 1.1, -s * 0.7)];
+        g.fillPoints(ear2, true);
+        g.fillStyle(0xffaaaa, 0.4);
+        g.fillTriangle(s * 0.55, -s * 0.82, s * 0.65, -s * 1.2, s * 0.75, -s * 0.77);
+        // Legs
+        g.fillStyle(dark, 0.8);
+        g.fillRect(-s * 0.5, s * 0.4, s * 0.3, s * 0.55);
+        g.fillRect(s * 0.2, s * 0.4, s * 0.3, s * 0.55);
+        g.fillRect(-s * 0.8, s * 0.35, s * 0.28, s * 0.5);
+        g.fillRect(s * 0.55, s * 0.35, s * 0.28, s * 0.5);
+        // Tail (bushy)
+        g.fillStyle(color, 1);
+        g.fillEllipse(-s * 1.0, -s * 0.1, s * 0.6, s * 0.35);
+        g.fillStyle(hi, 0.2);
+        g.fillEllipse(-s * 1.0, -s * 0.18, s * 0.35, s * 0.2);
+        break;
+      }
+      case "boar": {
+        const s = cfg.size;
+        // Heavy barrel body
+        g.fillStyle(dark, 1);
+        g.fillEllipse(1, 2, s * 2.4, s * 1.5);
+        g.fillStyle(color, 1);
+        g.fillEllipse(0, 0, s * 2.4, s * 1.5);
+        // Back bristle
+        g.fillStyle(dark, 0.7);
+        for (let i = -3; i <= 3; i++) {
+          g.fillRect(i * s * 0.25, -s * 0.7, s * 0.18, s * 0.45);
+        }
+        // Head — blocky, large
+        g.fillStyle(accent, 1);
+        g.fillRect(s * 0.5, -s * 0.6, s * 1.0, s * 0.85);
+        // Snout disc
+        g.fillStyle(dark, 1);
+        g.fillCircle(s * 1.35, -s * 0.3, s * 0.35);
+        g.fillStyle(accent, 0.8);
+        g.fillCircle(s * 1.35, -s * 0.3, s * 0.25);
+        // Nostrils
+        g.fillStyle(dark, 1);
+        g.fillCircle(s * 1.25, -s * 0.28, s * 0.08);
+        g.fillCircle(s * 1.45, -s * 0.28, s * 0.08);
+        // Tusks
+        g.fillStyle(0xffffcc, 1);
+        g.fillRect(s * 1.1, -s * 0.08, s * 0.4, s * 0.15);
+        g.fillRect(s * 1.1, s * 0.08, s * 0.35, s * 0.13);
+        // Eyes — tiny, angry
+        g.fillStyle(0xff4400, 1);
+        g.fillCircle(s * 0.72, -s * 0.55, s * 0.14);
+        g.fillStyle(hi, 0.8);
+        g.fillCircle(s * 0.74, -s * 0.57, s * 0.05);
+        // Legs (stubby)
+        g.fillStyle(dark, 1);
+        g.fillRect(-s * 0.6, s * 0.55, s * 0.35, s * 0.5);
+        g.fillRect(-s * 0.1, s * 0.55, s * 0.35, s * 0.5);
+        g.fillRect(s * 0.4, s * 0.55, s * 0.35, s * 0.5);
+        break;
+      }
+      case "goblin": {
+        const s = cfg.size;
+        // Hunched humanoid — big head, spindly body
+        // Legs
+        g.fillStyle(dark, 1);
+        g.fillRect(-s * 0.35, s * 0.1, s * 0.28, s * 0.65);
+        g.fillRect(s * 0.07, s * 0.1, s * 0.28, s * 0.65);
+        // Feet
+        g.fillStyle(accent, 1);
+        g.fillEllipse(-s * 0.2, s * 0.7, s * 0.5, s * 0.22);
+        g.fillEllipse(s * 0.2, s * 0.7, s * 0.5, s * 0.22);
+        // Body — small, hunched
+        g.fillStyle(color, 1);
+        g.fillRect(-s * 0.45, -s * 0.5, s * 0.9, s * 0.65);
+        g.fillStyle(hi, 0.15);
+        g.fillRect(-s * 0.4, -s * 0.5, s * 0.8, s * 0.2);
+        // Ragged armor bits
+        g.fillStyle(accent, 0.8);
+        g.fillRect(-s * 0.45, -s * 0.15, s * 0.35, s * 0.2);
+        // Arms (long, dangling)
+        g.fillStyle(dark, 0.9);
+        g.fillRect(-s * 0.6, -s * 0.45, s * 0.2, s * 0.7);
+        g.fillRect(s * 0.4, -s * 0.45, s * 0.2, s * 0.7);
+        // Claws
+        g.fillStyle(0xddcc88, 1);
+        g.fillRect(-s * 0.65, s * 0.2, s * 0.15, s * 0.12);
+        g.fillRect(s * 0.52, s * 0.2, s * 0.15, s * 0.12);
+        // Big head
+        g.fillStyle(color, 1);
+        g.fillEllipse(0, -s * 0.9, s * 1.1, s * 1.0);
+        // Goblin ears (huge, pointed)
+        g.fillStyle(color, 1);
+        const le = [new Phaser.Math.Vector2(-s * 0.45, -s * 0.8), new Phaser.Math.Vector2(-s * 0.85, -s * 1.1), new Phaser.Math.Vector2(-s * 0.25, -s * 0.6)];
+        const re = [new Phaser.Math.Vector2(s * 0.45, -s * 0.8), new Phaser.Math.Vector2(s * 0.85, -s * 1.1), new Phaser.Math.Vector2(s * 0.25, -s * 0.6)];
+        g.fillPoints(le, true);
+        g.fillPoints(re, true);
+        g.fillStyle(0xffaaaa, 0.4);
+        g.fillTriangle(-s * 0.45, -s * 0.8, -s * 0.8, -s * 1.05, -s * 0.28, -s * 0.65);
+        g.fillTriangle(s * 0.45, -s * 0.8, s * 0.8, -s * 1.05, s * 0.28, -s * 0.65);
+        // Eyes — huge yellowy
+        g.fillStyle(0xffee00, 1);
+        g.fillEllipse(-s * 0.22, -s * 0.88, s * 0.32, s * 0.28);
+        g.fillEllipse(s * 0.22, -s * 0.88, s * 0.32, s * 0.28);
+        g.fillStyle(0x111100, 1);
+        g.fillEllipse(-s * 0.22, -s * 0.88, s * 0.16, s * 0.22);
+        g.fillEllipse(s * 0.22, -s * 0.88, s * 0.16, s * 0.22);
+        g.fillStyle(hi, 0.9);
+        g.fillCircle(-s * 0.18, -s * 0.92, s * 0.06);
+        g.fillCircle(s * 0.26, -s * 0.92, s * 0.06);
+        // Nose (bulbous)
+        g.fillStyle(accent, 1);
+        g.fillCircle(0, -s * 0.78, s * 0.18);
+        // Mouth (fangs showing)
+        g.fillStyle(dark, 0.8);
+        g.fillRect(-s * 0.18, -s * 0.62, s * 0.36, s * 0.12);
+        g.fillStyle(0xffffff, 1);
+        g.fillRect(-s * 0.15, -s * 0.68, s * 0.08, s * 0.1);
+        g.fillRect(s * 0.07, -s * 0.68, s * 0.08, s * 0.1);
+        break;
+      }
+      case "slime": {
+        const s = cfg.size;
+        // Wobbly translucent blob
+        g.fillStyle(dark, 0.9);
+        g.fillEllipse(1, 2, s * 2.2, s * 1.4);
+        g.fillStyle(color, 0.85);
+        g.fillEllipse(0, 0, s * 2.2, s * 1.4);
+        // Inner glow (bright center)
+        g.fillStyle(hi, 0.25);
+        g.fillEllipse(-s * 0.3, -s * 0.3, s * 1.1, s * 0.7);
+        // Bubble reflections
+        g.fillStyle(hi, 0.4);
+        g.fillCircle(-s * 0.6, -s * 0.45, s * 0.18);
+        g.fillCircle(s * 0.2, -s * 0.55, s * 0.1);
+        // Drippy bottom edge
+        g.fillStyle(accent, 0.7);
+        g.fillEllipse(0, s * 0.5, s * 2.0, s * 0.55);
+        // Cute eyes (wobbly)
+        g.fillStyle(dark, 1);
+        g.fillEllipse(-s * 0.3, -s * 0.05, s * 0.35, s * 0.4);
+        g.fillEllipse(s * 0.3, -s * 0.05, s * 0.35, s * 0.4);
+        // Irises
+        g.fillStyle(hi, 0.9);
+        g.fillEllipse(-s * 0.3, -s * 0.08, s * 0.18, s * 0.22);
+        g.fillEllipse(s * 0.3, -s * 0.08, s * 0.18, s * 0.22);
+        // Wide mouth
+        g.fillStyle(dark, 0.7);
+        g.fillRect(-s * 0.35, s * 0.25, s * 0.7, s * 0.15);
+        // Teeth
+        g.fillStyle(hi, 0.9);
+        g.fillRect(-s * 0.3, s * 0.22, s * 0.14, s * 0.1);
+        g.fillRect(-s * 0.05, s * 0.22, s * 0.14, s * 0.1);
+        g.fillRect(s * 0.2, s * 0.22, s * 0.14, s * 0.1);
+        break;
+      }
+      case "bandit": {
+        const s = cfg.size;
+        // Human-ish — similar to agent but rougher
+        // Legs
+        g.fillStyle(dark, 1);
+        g.fillRect(-s * 0.35, s * 0.08, s * 0.28, s * 0.65);
+        g.fillRect(s * 0.07, s * 0.08, s * 0.28, s * 0.65);
+        // Boots
+        g.fillStyle(accent, 1);
+        g.fillRect(-s * 0.38, s * 0.58, s * 0.34, s * 0.18);
+        g.fillRect(s * 0.04, s * 0.58, s * 0.34, s * 0.18);
+        // Body — leather vest
+        g.fillStyle(color, 1);
+        g.fillRect(-s * 0.5, -s * 0.55, s * 1.0, s * 0.68);
+        g.fillStyle(hi, 0.15);
+        g.fillRect(-s * 0.45, -s * 0.55, s * 0.9, s * 0.2);
+        // Sash / belt
+        g.fillStyle(0x995522, 0.8);
+        g.fillRect(-s * 0.5, -s * 0.1, s, s * 0.18);
+        // Knife on belt
+        g.fillStyle(0xdddddd, 0.9);
+        g.fillRect(s * 0.3, -s * 0.08, s * 0.12, s * 0.35);
+        // Head
+        g.fillStyle(0xddb888, 1);
+        g.fillEllipse(0, -s * 0.85, s * 0.78, s * 0.78);
+        // Stubble
+        g.fillStyle(dark, 0.3);
+        g.fillRect(-s * 0.28, -s * 0.58, s * 0.56, s * 0.12);
+        // Bandana / mask
+        g.fillStyle(accent, 0.9);
+        g.fillRect(-s * 0.38, -s * 0.78, s * 0.76, s * 0.22);
+        g.fillStyle(color, 0.6);
+        g.fillRect(-s * 0.38, -s * 0.78, s * 0.76, s * 0.06);
+        // Eyes — squinting
+        g.fillStyle(0x333300, 1);
+        g.fillRect(-s * 0.22, -s * 0.92, s * 0.16, s * 0.1);
+        g.fillRect(s * 0.06, -s * 0.92, s * 0.16, s * 0.1);
+        g.fillStyle(0xffcc00, 0.7);
+        g.fillRect(-s * 0.2, -s * 0.92, s * 0.1, s * 0.08);
+        g.fillRect(s * 0.1, -s * 0.92, s * 0.1, s * 0.08);
+        // Weapon — dagger raised
+        g.fillStyle(0xccccdd, 1);
+        g.fillRect(-s * 0.7, -s * 1.0, s * 0.15, s * 0.55);
+        g.fillStyle(0x885533, 0.9);
+        g.fillRect(-s * 0.73, -s * 0.5, s * 0.22, s * 0.12);
+        break;
+      }
+      case "bear": {
+        const s = cfg.size;
+        // Massive furry body
+        g.fillStyle(dark, 1);
+        g.fillEllipse(1, 2, s * 2.2, s * 1.8);
+        g.fillStyle(color, 1);
+        g.fillEllipse(0, 0, s * 2.2, s * 1.8);
+        // Fur texture — lighter belly
+        g.fillStyle(0xddbb88, 0.4);
+        g.fillEllipse(0, s * 0.2, s * 1.0, s * 0.9);
+        // Back fur
+        g.fillStyle(dark, 0.35);
+        for (let i = -2; i <= 2; i++) {
+          g.fillEllipse(i * s * 0.35, -s * 0.75, s * 0.3, s * 0.5);
+        }
+        // Head — big round
+        g.fillStyle(color, 1);
+        g.fillCircle(0, -s * 0.9, s * 0.75);
+        // Ears
+        g.fillStyle(color, 1);
+        g.fillCircle(-s * 0.55, -s * 1.45, s * 0.3);
+        g.fillCircle(s * 0.55, -s * 1.45, s * 0.3);
+        g.fillStyle(0xffaaaa, 0.4);
+        g.fillCircle(-s * 0.55, -s * 1.45, s * 0.16);
+        g.fillCircle(s * 0.55, -s * 1.45, s * 0.16);
+        // Muzzle
+        g.fillStyle(0xddbb88, 0.8);
+        g.fillEllipse(0, -s * 0.7, s * 0.7, s * 0.5);
+        // Nose
+        g.fillStyle(0x111111, 1);
+        g.fillEllipse(0, -s * 0.82, s * 0.3, s * 0.2);
+        g.fillStyle(hi, 0.3);
+        g.fillCircle(-s * 0.06, -s * 0.84, s * 0.07);
+        // Eyes — small, gleaming
+        g.fillStyle(0x332200, 1);
+        g.fillCircle(-s * 0.32, -s * 1.0, s * 0.16);
+        g.fillCircle(s * 0.32, -s * 1.0, s * 0.16);
+        g.fillStyle(hi, 0.9);
+        g.fillCircle(-s * 0.28, -s * 1.03, s * 0.06);
+        g.fillCircle(s * 0.36, -s * 1.03, s * 0.06);
+        // Arms/paws
+        g.fillStyle(color, 1);
+        g.fillEllipse(-s * 1.05, -s * 0.1, s * 0.65, s * 0.55);
+        g.fillEllipse(s * 1.05, -s * 0.1, s * 0.65, s * 0.55);
+        // Claws
+        g.fillStyle(dark, 1);
+        for (let i = -1; i <= 1; i++) {
+          g.fillRect(-s * 1.25 + i * s * 0.15, s * 0.18, s * 0.1, s * 0.18);
+          g.fillRect(s * 0.88 + i * s * 0.15, s * 0.18, s * 0.1, s * 0.18);
+        }
+        break;
+      }
+      case "spider": {
+        const s = cfg.size;
+        // Big round abdomen
+        g.fillStyle(dark, 1);
+        g.fillEllipse(-s * 0.2, s * 0.1, s * 1.5, s * 1.2);
+        g.fillStyle(color, 1);
+        g.fillEllipse(-s * 0.3, 0, s * 1.5, s * 1.2);
+        // Abdomen pattern
+        g.fillStyle(0xff2200, 0.7);
+        g.fillEllipse(-s * 0.4, -s * 0.1, s * 0.4, s * 0.6);
+        g.fillStyle(hi, 0.15);
+        g.fillEllipse(-s * 0.5, -s * 0.25, s * 0.55, s * 0.45);
+        // Cephalothorax (front body)
+        g.fillStyle(accent, 1);
+        g.fillEllipse(s * 0.6, -s * 0.1, s * 0.8, s * 0.75);
+        g.fillStyle(hi, 0.2);
+        g.fillEllipse(s * 0.5, -s * 0.25, s * 0.4, s * 0.3);
+        // 8 eyes (two rows)
+        g.fillStyle(0xddee00, 1);
+        for (let i = 0; i < 4; i++) {
+          g.fillCircle(s * (0.35 + i * 0.18), -s * 0.32, s * 0.1);
+          g.fillCircle(s * (0.38 + i * 0.16), -s * 0.14, s * 0.08);
+        }
+        g.fillStyle(0x110000, 1);
+        for (let i = 0; i < 4; i++) {
+          g.fillCircle(s * (0.35 + i * 0.18), -s * 0.32, s * 0.06);
+        }
+        // 8 legs (4 per side)
+        g.lineStyle(s * 0.22, dark, 0.9);
+        const legAngles = [-0.8, -0.3, 0.2, 0.7];
+        for (const la of legAngles) {
+          // Left legs
+          g.beginPath();
+          g.moveTo(s * 0.3, la * s);
+          g.lineTo(-s * 0.8, (la - 0.5) * s);
+          g.lineTo(-s * 1.5, la * s * 0.6);
+          g.strokePath();
+          // Right legs
+          g.beginPath();
+          g.moveTo(s * 0.9, la * s);
+          g.lineTo(s * 1.8, (la - 0.5) * s);
+          g.lineTo(s * 2.2, la * s * 0.6);
+          g.strokePath();
+        }
+        // Fangs
+        g.fillStyle(0xddcc88, 1);
+        g.fillRect(s * 0.7, s * 0.22, s * 0.12, s * 0.28);
+        g.fillRect(s * 0.9, s * 0.22, s * 0.12, s * 0.28);
+        break;
+      }
+      case "orc": {
+        const s = cfg.size;
+        // Stocky, wide humanoid — greenskin
+        // Legs (bowed)
+        g.fillStyle(dark, 1);
+        g.fillRect(-s * 0.45, s * 0.05, s * 0.34, s * 0.65);
+        g.fillRect(s * 0.12, s * 0.05, s * 0.34, s * 0.65);
+        // Boots/feet
+        g.fillStyle(accent, 1);
+        g.fillRect(-s * 0.5, s * 0.6, s * 0.4, s * 0.2);
+        g.fillRect(s * 0.1, s * 0.6, s * 0.4, s * 0.2);
+        // Body — wide, muscular
+        g.fillStyle(color, 1);
+        g.fillRect(-s * 0.62, -s * 0.6, s * 1.24, s * 0.7);
+        // Armor plates
+        g.fillStyle(0x555566, 1);
+        g.fillRect(-s * 0.62, -s * 0.6, s * 1.24, s * 0.22);
+        g.fillStyle(hi, 0.2);
+        g.fillRect(-s * 0.58, -s * 0.6, s * 1.16, s * 0.08);
+        // Spiked shoulder guards
+        g.fillStyle(dark, 1);
+        g.fillRect(-s * 0.82, -s * 0.58, s * 0.26, s * 0.3);
+        g.fillRect(s * 0.56, -s * 0.58, s * 0.26, s * 0.3);
+        // Spikes
+        g.fillStyle(0xddcc88, 0.9);
+        g.fillTriangle(-s * 0.75, -s * 0.6, -s * 0.68, -s * 0.95, -s * 0.62, -s * 0.6);
+        g.fillTriangle(s * 0.62, -s * 0.6, s * 0.7, -s * 0.95, s * 0.77, -s * 0.6);
+        // Arms (thick)
+        g.fillStyle(color, 1);
+        g.fillRect(-s * 0.82, -s * 0.55, s * 0.22, s * 0.75);
+        g.fillRect(s * 0.6, -s * 0.55, s * 0.22, s * 0.75);
+        // Weapon — crude axe
+        g.fillStyle(0x888899, 1);
+        g.fillRect(s * 0.82, -s * 0.82, s * 0.35, s * 0.45);
+        g.fillRect(s * 0.88, -s * 0.38, s * 0.12, s * 0.7);
+        g.fillStyle(hi, 0.3);
+        g.fillRect(s * 0.82, -s * 0.82, s * 0.1, s * 0.45);
+        // Head — square jaw, tusks
+        g.fillStyle(color, 1);
+        g.fillRect(-s * 0.48, -s * 1.25, s * 0.96, s * 0.7);
+        // Jaw
+        g.fillStyle(accent, 0.8);
+        g.fillRect(-s * 0.42, -s * 0.72, s * 0.84, s * 0.22);
+        // Tusks
+        g.fillStyle(0xffffcc, 1);
+        g.fillRect(-s * 0.28, -s * 0.7, s * 0.12, s * 0.26);
+        g.fillRect(s * 0.16, -s * 0.7, s * 0.12, s * 0.26);
+        // Eyes — red, angry brow
+        g.fillStyle(dark, 0.8);
+        g.fillRect(-s * 0.42, -s * 1.18, s * 0.84, s * 0.14);
+        g.fillStyle(0xff3300, 1);
+        g.fillEllipse(-s * 0.22, -s * 1.04, s * 0.25, s * 0.22);
+        g.fillEllipse(s * 0.22, -s * 1.04, s * 0.25, s * 0.22);
+        g.fillStyle(0x220000, 1);
+        g.fillEllipse(-s * 0.22, -s * 1.04, s * 0.13, s * 0.15);
+        g.fillEllipse(s * 0.22, -s * 1.04, s * 0.13, s * 0.15);
+        // War paint stripe
+        g.fillStyle(0xff4400, 0.6);
+        g.fillRect(-s * 0.48, -s * 1.06, s * 0.96, s * 0.1);
+        break;
+      }
+      case "harpy": {
+        const s = cfg.size;
+        // Winged creature — humanoid upper, bird lower
+        // Wing span (back)
+        g.fillStyle(dark, 0.8);
+        g.fillEllipse(-s * 1.1, -s * 0.4, s * 1.4, s * 0.7);
+        g.fillEllipse(s * 1.1, -s * 0.4, s * 1.4, s * 0.7);
+        // Wing tips
+        g.fillStyle(accent, 0.7);
+        for (let i = 0; i < 4; i++) {
+          g.fillEllipse(-s * 0.7 - i * s * 0.22, -s * 0.1, s * 0.18, s * 0.55);
+          g.fillEllipse(s * 0.7 + i * s * 0.22, -s * 0.1, s * 0.18, s * 0.55);
+        }
+        // Talons
+        g.fillStyle(0xddcc88, 1);
+        for (let i = -1; i <= 1; i++) {
+          g.fillRect(i * s * 0.22 - s * 0.06, s * 0.55, s * 0.1, s * 0.25);
+        }
+        // Bird legs (scaly)
+        g.fillStyle(0xddaa55, 0.9);
+        g.fillRect(-s * 0.22, s * 0.08, s * 0.16, s * 0.5);
+        g.fillRect(s * 0.06, s * 0.08, s * 0.16, s * 0.5);
+        // Body
+        g.fillStyle(color, 1);
+        g.fillEllipse(0, -s * 0.12, s * 0.7, s * 0.85);
+        g.fillStyle(hi, 0.18);
+        g.fillEllipse(-s * 0.1, -s * 0.3, s * 0.35, s * 0.4);
+        // Head
+        g.fillStyle(color, 1);
+        g.fillCircle(0, -s * 0.72, s * 0.42);
+        // Crest feathers
+        g.fillStyle(accent, 1);
+        g.fillRect(-s * 0.1, -s * 1.16, s * 0.08, s * 0.28);
+        g.fillRect(-s * 0.22, -s * 1.1, s * 0.08, s * 0.22);
+        g.fillRect(s * 0.06, -s * 1.1, s * 0.08, s * 0.22);
+        // Beak
+        g.fillStyle(0xddcc44, 1);
+        g.fillTriangle(-s * 0.12, -s * 0.68, s * 0.12, -s * 0.68, 0, -s * 0.5);
+        // Eyes
+        g.fillStyle(0xffaa00, 1);
+        g.fillCircle(-s * 0.16, -s * 0.78, s * 0.14);
+        g.fillCircle(s * 0.16, -s * 0.78, s * 0.14);
+        g.fillStyle(0x1a0a00, 1);
+        g.fillCircle(-s * 0.16, -s * 0.78, s * 0.08);
+        g.fillCircle(s * 0.16, -s * 0.78, s * 0.08);
+        g.fillStyle(hi, 0.9);
+        g.fillCircle(-s * 0.13, -s * 0.81, s * 0.04);
+        g.fillCircle(s * 0.19, -s * 0.81, s * 0.04);
+        break;
+      }
+      case "shadow": {
+        const s = cfg.size;
+        // Shadow stalker — dark smoky figure, glowing eyes only
+        // Wispy smoke base
+        g.fillStyle(dark, 0.7);
+        g.fillEllipse(0, s * 0.3, s * 1.8, s * 0.6);
+        g.fillEllipse(s * 0.4, s * 0.5, s * 0.7, s * 0.4);
+        g.fillEllipse(-s * 0.4, s * 0.55, s * 0.6, s * 0.35);
+        // Main mass
+        g.fillStyle(accent, 0.9);
+        g.fillEllipse(0, -s * 0.1, s * 1.4, s * 1.5);
+        // Darker core
+        g.fillStyle(dark, 0.95);
+        g.fillEllipse(0, -s * 0.15, s * 0.9, s * 1.1);
+        // Wispy tendrils
+        g.fillStyle(accent, 0.4);
+        g.fillEllipse(-s * 0.7, -s * 0.4, s * 0.35, s * 0.8);
+        g.fillEllipse(s * 0.65, -s * 0.3, s * 0.35, s * 0.7);
+        g.fillEllipse(-s * 0.3, -s * 0.9, s * 0.28, s * 0.55);
+        g.fillEllipse(s * 0.35, -s * 0.85, s * 0.25, s * 0.5);
+        // Glowing eyes — the only bright element
+        g.fillStyle(0x66aaff, 1);
+        g.fillCircle(-s * 0.22, -s * 0.35, s * 0.22);
+        g.fillCircle(s * 0.22, -s * 0.35, s * 0.22);
+        g.fillStyle(hi, 0.9);
+        g.fillCircle(-s * 0.22, -s * 0.35, s * 0.14);
+        g.fillCircle(s * 0.22, -s * 0.35, s * 0.14);
+        g.fillStyle(0x0044ff, 1);
+        g.fillCircle(-s * 0.22, -s * 0.35, s * 0.08);
+        g.fillCircle(s * 0.22, -s * 0.35, s * 0.08);
+        // Blue-white core glow
+        g.fillStyle(0x8899ff, 0.12);
+        g.fillCircle(0, -s * 0.35, s * 0.65);
+        break;
+      }
+      case "knight": {
+        const s = cfg.size;
+        // Dark knight — imposing full-plate humanoid
+        // Legs — plated
+        g.fillStyle(dark, 1);
+        g.fillRect(-s * 0.4, s * 0.05, s * 0.32, s * 0.65);
+        g.fillRect(s * 0.08, s * 0.05, s * 0.32, s * 0.65);
+        // Boot armor
+        g.fillStyle(accent, 1);
+        g.fillRect(-s * 0.44, s * 0.58, s * 0.38, s * 0.22);
+        g.fillRect(s * 0.06, s * 0.58, s * 0.38, s * 0.22);
+        g.fillStyle(0x4444aa, 0.3);
+        g.fillRect(-s * 0.44, s * 0.58, s * 0.38, s * 0.06);
+        g.fillRect(s * 0.06, s * 0.58, s * 0.38, s * 0.06);
+        // Body — heavy plate
+        g.fillStyle(color, 1);
+        g.fillRect(-s * 0.58, -s * 0.6, s * 1.16, s * 0.7);
+        // Plate ridges
+        g.fillStyle(accent, 0.6);
+        g.fillRect(-s * 0.58, -s * 0.6, s * 1.16, s * 0.18);
+        g.fillRect(-s * 0.58, -s * 0.22, s * 1.16, s * 0.12);
+        g.fillStyle(0x5555ff, 0.18);
+        g.fillRect(-s * 0.55, -s * 0.58, s * 1.1, s * 0.06);
+        // Glowing rune on chest
+        g.fillStyle(0x5555ff, 0.6);
+        g.fillRect(-s * 0.08, -s * 0.42, s * 0.16, s * 0.22);
+        g.fillRect(-s * 0.16, -s * 0.34, s * 0.32, s * 0.06);
+        // Massive pauldrons
+        g.fillStyle(dark, 1);
+        g.fillRect(-s * 0.86, -s * 0.62, s * 0.3, s * 0.38);
+        g.fillRect(s * 0.56, -s * 0.62, s * 0.3, s * 0.38);
+        g.fillStyle(0x3333aa, 0.3);
+        g.fillRect(-s * 0.86, -s * 0.62, s * 0.3, s * 0.1);
+        g.fillRect(s * 0.56, -s * 0.62, s * 0.3, s * 0.1);
+        // Arms
+        g.fillStyle(color, 1);
+        g.fillRect(-s * 0.86, -s * 0.56, s * 0.28, s * 0.72);
+        g.fillRect(s * 0.58, -s * 0.56, s * 0.28, s * 0.72);
+        // Gauntlets
+        g.fillStyle(dark, 1);
+        g.fillRect(-s * 0.88, s * 0.08, s * 0.3, s * 0.22);
+        g.fillRect(s * 0.58, s * 0.08, s * 0.3, s * 0.22);
+        // Great sword
+        g.fillStyle(0x9999bb, 1);
+        g.fillRect(s * 0.86, -s * 1.05, s * 0.2, s * 1.0);
+        g.fillStyle(hi, 0.5);
+        g.fillRect(s * 0.86, -s * 1.05, s * 0.08, s * 1.0);
+        g.fillStyle(0xddcc88, 1);
+        g.fillRect(s * 0.78, -s * 0.12, s * 0.36, s * 0.18);
+        g.fillStyle(accent, 1);
+        g.fillRect(s * 0.9, s * 0.06, s * 0.12, s * 0.28);
+        // Helm — full face with glowing eye slit
+        g.fillStyle(dark, 1);
+        g.fillRect(-s * 0.46, -s * 1.28, s * 0.92, s * 0.74);
+        g.fillStyle(accent, 0.5);
+        g.fillRect(-s * 0.46, -s * 1.28, s * 0.92, s * 0.18);
+        // Visor eye slit — glowing red
+        g.fillStyle(0xff2200, 1);
+        g.fillRect(-s * 0.35, -s * 1.06, s * 0.7, s * 0.1);
+        g.fillStyle(0xff7744, 0.6);
+        g.fillRect(-s * 0.35, -s * 1.06, s * 0.7, s * 0.04);
+        // Crown on helm
+        g.fillStyle(0x442244, 1);
+        g.fillRect(-s * 0.46, -s * 1.3, s * 0.92, s * 0.08);
+        for (let i = -2; i <= 2; i++) {
+          g.fillRect(i * s * 0.2 - s * 0.06, -s * 1.5, s * 0.12, s * 0.22);
+        }
+        break;
+      }
+      case "necro": {
+        const s = cfg.size;
+        // Necromancer — robed, bony hands, skull staff
+        // Robe base
+        g.fillStyle(dark, 1);
+        g.fillEllipse(0, s * 0.35, s * 1.2, s * 0.55);
+        g.fillStyle(color, 1);
+        g.fillRect(-s * 0.52, -s * 0.55, s * 1.04, s * 0.95);
+        // Robe pattern
+        g.fillStyle(accent, 0.5);
+        g.fillRect(-s * 0.52, -s * 0.55, s * 1.04, s * 0.18);
+        // Bone trim
+        g.fillStyle(0xeeeecc, 0.6);
+        g.fillRect(-s * 0.52, -s * 0.38, s * 1.04, s * 0.06);
+        g.fillRect(-s * 0.52, s * 0.22, s * 1.04, s * 0.06);
+        // Bony arms / hands
+        g.fillStyle(0xccbbaa, 1);
+        g.fillRect(-s * 0.72, -s * 0.48, s * 0.22, s * 0.65);
+        g.fillRect(s * 0.5, -s * 0.48, s * 0.22, s * 0.65);
+        // Claw hand fingers
+        for (let i = 0; i < 3; i++) {
+          g.fillRect(-s * 0.76 + i * s * 0.1, s * 0.15, s * 0.07, s * 0.22);
+          g.fillRect(s * 0.52 + i * s * 0.1, s * 0.15, s * 0.07, s * 0.22);
+        }
+        // Skull staff (iconic)
+        g.fillStyle(0x885599, 1);
+        g.fillRect(-s * 0.85, -s * 1.35, s * 0.14, s * 1.2);
+        // Skull on staff
+        g.fillStyle(0xeeeedd, 1);
+        g.fillEllipse(-s * 0.78, -s * 1.48, s * 0.45, s * 0.42);
+        g.fillStyle(0x110011, 1);
+        g.fillEllipse(-s * 0.88, -s * 1.5, s * 0.14, s * 0.16);
+        g.fillEllipse(-s * 0.68, -s * 1.5, s * 0.14, s * 0.16);
+        // Skull jaw
+        g.fillStyle(0xeeeedd, 0.8);
+        g.fillRect(-s * 0.92, -s * 1.34, s * 0.28, s * 0.1);
+        for (let i = 0; i < 4; i++) {
+          g.fillRect(-s * 0.9 + i * s * 0.09, -s * 1.26, s * 0.06, s * 0.1);
+        }
+        // Glowing skull eyes
+        g.fillStyle(0xaa44ff, 0.9);
+        g.fillEllipse(-s * 0.88, -s * 1.5, s * 0.09, s * 0.1);
+        g.fillEllipse(-s * 0.68, -s * 1.5, s * 0.09, s * 0.1);
+        // Head — hood/cowl
+        g.fillStyle(dark, 1);
+        g.fillEllipse(0, -s * 0.82, s * 0.78, s * 0.75);
+        // Death pallor skin (partially visible)
+        g.fillStyle(0xbbaacc, 1);
+        g.fillEllipse(s * 0.06, -s * 0.8, s * 0.5, s * 0.52);
+        // Sunken eyes — glowing purple
+        g.fillStyle(0xaa44ff, 1);
+        g.fillCircle(-s * 0.08, -s * 0.86, s * 0.15);
+        g.fillCircle(s * 0.22, -s * 0.86, s * 0.15);
+        g.fillStyle(0x660099, 1);
+        g.fillCircle(-s * 0.08, -s * 0.86, s * 0.08);
+        g.fillCircle(s * 0.22, -s * 0.86, s * 0.08);
+        g.fillStyle(hi, 0.9);
+        g.fillCircle(-s * 0.05, -s * 0.89, s * 0.05);
+        g.fillCircle(s * 0.25, -s * 0.89, s * 0.05);
+        // Floating energy orb
+        g.fillStyle(0xcc66ff, 0.5);
+        g.fillCircle(s * 0.68, -s * 0.6, s * 0.2);
+        g.fillStyle(hi, 0.6);
+        g.fillCircle(s * 0.65, -s * 0.63, s * 0.08);
+        break;
+      }
+    }
   }
 
   // ── Mob Sprites ────────────────────────────────────────
@@ -978,113 +1888,41 @@ export class GameScene extends Phaser.Scene {
     const my = (mob.y ?? mob.position?.y ?? 100) * WORLD_SCALE;
     const c = this.add.container(mx, my);
     const tid = mob.templateId || "giant_rat";
-    const cfg = MOB_CONFIG[tid] || { color: 0xaa5533, size: 6, shape: "circle" };
+    const cfg = MOB_CONFIG[tid] || MOB_CONFIG.giant_rat;
+
+    // Scale mob sprites — smaller mobs at 2×, bosses at 3×
+    const SC = cfg.size >= 14 ? 3.0 : cfg.size >= 10 ? 2.5 : 2.0;
 
     // ── Mob shadow ────────────────────────────────────────────
-    c.add(this.add.ellipse(0, cfg.size + 3, cfg.size * 1.6, 5, 0x000000, 0.30));
+    c.add(this.add.ellipse(0, cfg.size * SC * 0.55, cfg.size * SC * 0.85, cfg.size * SC * 0.22, 0x000000, 0.30));
 
-    // ── Threat aura (danger ring) ─────────────────────────────
-    c.add(this.add.circle(0, 0, cfg.size + 5, 0xff2200, 0.04));
-    c.add(this.add.circle(0, 0, cfg.size + 8, 0xff2200, 0.02));
+    // ── Threat aura (pulsing danger ring for elites) ──────────
+    if (cfg.size >= 10) {
+      const aura = this.add.circle(0, 0, cfg.size * SC * 0.7, 0xff2200, 0.04);
+      c.add(aura);
+      (function pulseAura() {
+        animate(aura, { alpha: 0.08, scaleX: 1.08, scaleY: 1.08, duration: 1200, easing: "easeInOutSine",
+          onComplete: () => animate(aura, { alpha: 0.03, scaleX: 1.0, scaleY: 1.0, duration: 1200, easing: "easeInOutSine", onComplete: pulseAura }) });
+      })();
+    }
 
     // ── Body ─────────────────────────────────────────────────
     const body = this.add.graphics();
-    const darken = (col: number, f: number) => {
-      const r = Math.floor(((col >> 16) & 0xff) * f);
-      const g = Math.floor(((col >> 8) & 0xff) * f);
-      const b = Math.floor((col & 0xff) * f);
-      return (r << 16) | (g << 8) | b;
-    };
-    const lighter = (col: number, f: number) => {
-      const r = Math.min(255, Math.floor(((col >> 16) & 0xff) * f));
-      const g = Math.min(255, Math.floor(((col >> 8) & 0xff) * f));
-      const b = Math.min(255, Math.floor((col & 0xff) * f));
-      return (r << 16) | (g << 8) | b;
-    };
-
-    if (cfg.shape === "blob") {
-      // Slime/blob — multi-layered for 3D look
-      body.fillStyle(darken(cfg.color, 0.5), 1);
-      body.fillCircle(1, 2, cfg.size);
-      body.fillStyle(cfg.color, 1);
-      body.fillCircle(0, 0, cfg.size);
-      body.fillStyle(lighter(cfg.color, 1.4), 0.5);
-      body.fillCircle(-cfg.size * 0.25, -cfg.size * 0.25, cfg.size * 0.55);
-      // Eyes
-      body.fillStyle(0x111111, 1);
-      body.fillCircle(-cfg.size * 0.3, -cfg.size * 0.1, cfg.size * 0.22);
-      body.fillCircle(cfg.size * 0.3, -cfg.size * 0.1, cfg.size * 0.22);
-      body.fillStyle(0xffffff, 0.9);
-      body.fillCircle(-cfg.size * 0.25, -cfg.size * 0.15, cfg.size * 0.1);
-      body.fillCircle(cfg.size * 0.35, -cfg.size * 0.15, cfg.size * 0.1);
-      // Mouth
-      body.fillStyle(darken(cfg.color, 0.4), 0.8);
-      body.fillRect(-cfg.size * 0.25, cfg.size * 0.2, cfg.size * 0.5, cfg.size * 0.15);
-
-    } else if (cfg.shape === "hex") {
-      const s = cfg.size;
-      // Build hex points
-      const pts = [];
-      for (let i = 0; i < 6; i++) {
-        const a = (Math.PI / 3) * i - Math.PI / 2;
-        pts.push(new Phaser.Math.Vector2(Math.cos(a) * s, Math.sin(a) * s));
-      }
-      // Dark underside
-      body.fillStyle(darken(cfg.color, 0.55), 1);
-      body.fillPoints(pts.map(p => new Phaser.Math.Vector2(p.x + 1, p.y + 1)), true);
-      // Main body
-      body.fillStyle(cfg.color, 1);
-      body.fillPoints(pts, true);
-      // Rim highlight
-      body.lineStyle(2, lighter(cfg.color, 1.5), 0.5);
-      body.strokePoints(pts, true);
-      // Inner highlight disc
-      body.fillStyle(lighter(cfg.color, 1.6), 0.15);
-      body.fillCircle(-s * 0.15, -s * 0.2, s * 0.5);
-      // Glowing eyes
-      body.fillStyle(0xff2200, 1);
-      body.fillCircle(-s * 0.28, -s * 0.1, s * 0.2);
-      body.fillCircle(s * 0.28, -s * 0.1, s * 0.2);
-      body.fillStyle(0xff6644, 0.9);
-      body.fillCircle(-s * 0.28, -s * 0.15, s * 0.1);
-      body.fillCircle(s * 0.28, -s * 0.15, s * 0.1);
-
-    } else {
-      // Circle — multi-layer shading
-      const s = cfg.size;
-      body.fillStyle(darken(cfg.color, 0.5), 1);
-      body.fillCircle(1, 2, s);
-      body.fillStyle(cfg.color, 1);
-      body.fillCircle(0, 0, s);
-      // Fur/texture ring
-      body.lineStyle(1.5, darken(cfg.color, 0.65), 0.6);
-      body.strokeCircle(0, 0, s);
-      // Sheen
-      body.fillStyle(lighter(cfg.color, 1.5), 0.2);
-      body.fillCircle(-s * 0.28, -s * 0.28, s * 0.45);
-      // Eyes
-      body.fillStyle(0xffaa00, 1);
-      body.fillCircle(-s * 0.3, -s * 0.15, s * 0.22);
-      body.fillCircle(s * 0.3, -s * 0.15, s * 0.22);
-      body.fillStyle(0x1a1100, 1);
-      body.fillCircle(-s * 0.3, -s * 0.15, s * 0.13);
-      body.fillCircle(s * 0.3, -s * 0.15, s * 0.13);
-      body.fillStyle(0xffffff, 0.9);
-      body.fillCircle(-s * 0.26, -s * 0.18, s * 0.06);
-      body.fillCircle(s * 0.34, -s * 0.18, s * 0.06);
-    }
+    body.setScale(SC);
+    this.drawMobBody(body, cfg);
     c.add(body);
 
-    // Idle breathing via anime.js
-    idleBreathe(body, body.scaleX, 1.0);
+    // Idle breathe
+    idleBreathe(body, body.scaleX, body.scaleY);
 
-    // HP bar
+    // HP bar (wider for big mobs)
+    const barW = Math.max(24, cfg.size * SC * 1.4);
     const hpBar = this.add.graphics();
     c.add(hpBar);
-    this.drawHpBar(hpBar, mob.hp ?? mob.maxHp ?? 10, mob.maxHp ?? 10, cfg.size * 2.5, -(cfg.size + 4), true);
+    this.drawHpBar(hpBar, mob.hp ?? mob.maxHp ?? 10, mob.maxHp ?? 10, barW, -(cfg.size * SC * 0.75), true);
 
     // Name
-    const nameLabel = this.add.text(0, cfg.size + 6, mob.name || "?", {
+    const nameLabel = this.add.text(0, cfg.size * SC * 0.65, mob.name || "?", {
       fontSize: "8px", color: "#ee9966", fontFamily: "'Segoe UI', Arial, sans-serif",
       fontStyle: "bold", stroke: "#000000", strokeThickness: 3,
     }).setOrigin(0.5, 0);
