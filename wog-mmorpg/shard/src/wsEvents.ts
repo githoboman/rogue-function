@@ -12,6 +12,7 @@ import { ZoneRuntime } from "./zoneRuntime";
 // ============================================================
 
 export type GameEvent =
+  // ── Core game events ───────────────────────────────────────
   | { type: "combat_hit";       data: { playerId: string; playerName: string; mobId: string; mobName: string; damage: number; crit: boolean; mobHp: number; mobMaxHp: number } }
   | { type: "mob_died";         data: { mobId: string; mobName: string; zone: string; xpGained: number; goldDropped: number; loot: string[] } }
   | { type: "player_died";      data: { playerId: string; playerName: string; zone: string; deathCount: number } }
@@ -21,7 +22,19 @@ export type GameEvent =
   | { type: "quest_completed";  data: { playerId: string; playerName: string; questName: string; goldReward: number; xpReward: number } }
   | { type: "zone_transition";  data: { playerId: string; playerName: string; fromZone: string; toZone: string } }
   | { type: "agent_decision";   data: { playerId: string; playerName: string; action: string; target: string; reasoning: string } }
-  | { type: "tick";             data: WorldSnapshot };
+  | { type: "tick";             data: WorldSnapshot }
+  // ── FoxMQ consensus events ─────────────────────────────────
+  | { type: "zone_claimed";      data: { zone: string; claimant: string; seq: number } }
+  | { type: "zone_yielded";      data: { zone: string; agent: string } }
+  | { type: "quest_claimed";     data: { quest: string; claimant: string; seq: number } }
+  | { type: "quest_abandoned";   data: { quest: string; agent: string } }
+  | { type: "property_sold";     data: { propertyId: string; propertyName?: string; zone?: string; buyer: string; seller: string; price: number } }
+  | { type: "property_listed";   data: { propertyId: string; name: string; price: number; zone: string } }
+  | { type: "property_distress"; data: { propertyId: string; name: string; price: number; seller: string } }
+  // ── FoxMQ mesh / infra events ──────────────────────────────
+  | { type: "foxmq_status";  data: { connected: boolean; url?: string } }
+  | { type: "foxmq_message"; data: Record<string, unknown> }
+  | { type: "foxmq_mesh";    data: { agents: unknown[] } };
 
 export interface WorldSnapshot {
   timestamp: number;

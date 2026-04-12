@@ -204,6 +204,42 @@ export function getTotalPassiveIncome(playerId: string): number {
   return getPortfolio(playerId).reduce((sum, p) => sum + p.def.rentPerTick, 0);
 }
 
+// ─────────────────────────────────────────────────────────────
+// FOXMQ-DRIVEN MUTATIONS
+// Called exclusively by foxmqBridge.ts after consensus resolution.
+// These bypass gold/ownership checks — the bridge already validated.
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Apply a property ownership transfer that was settled via FoxMQ consensus.
+ * The bridge already validated gold and resolved first-offer-wins ordering.
+ */
+export function applyFoxmqTransfer(propertyId: string, newOwner: string): void {
+  const prop = properties.get(propertyId);
+  if (!prop) return;
+  prop.owner      = newOwner;
+  prop.listedFor  = null;
+  prop.acquiredAt = Date.now();
+  console.log(`[PropertyMarket] FoxMQ transfer: [${prop.def.name}] → ${newOwner}`);
+}
+
+/**
+ * Apply a listing price change (list or distress auction) via FoxMQ.
+ */
+export function applyFoxmqList(propertyId: string, price: number): void {
+  const prop = properties.get(propertyId);
+  if (!prop) return;
+  prop.listedFor = price > 0 ? price : null;
+}
+
+/**
+ * Apply a distress transfer (agent died, property seized at 60% price).
+ * The bridge handles the gold deduction; this just records ownership.
+ */
+export function applyFoxmqDistress(propertyId: string, newOwner: string): void {
+  applyFoxmqTransfer(propertyId, newOwner);
+}
+
 export function getMarketSnapshot() {
   const all = [...properties.values()];
   return {

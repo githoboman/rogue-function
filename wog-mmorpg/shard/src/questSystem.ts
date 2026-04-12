@@ -287,6 +287,16 @@ export class QuestManager {
     return { success: true, message: "Quest accepted", questName: quest.name };
   }
 
+  // ── Abandon Quest ─────────────────────────────────────────
+
+  abandonQuest(playerId: string, questId: string): boolean {
+    const playerProgress = this.getPlayerProgress(playerId);
+    const progress = playerProgress.get(questId);
+    if (!progress || progress.status !== "active") return false;
+    playerProgress.delete(questId);
+    return true;
+  }
+
   // ── Record Kill/Collect Progress ──────────────────────────
 
   recordKill(playerId: string, mobTemplateId: string): string[] {

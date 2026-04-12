@@ -20,11 +20,11 @@ import { GameConfig } from "./config";
 import { loadGameState, startAutoSave } from "./persistence";
 import { startHeartbeat } from "./aibtcHeartbeat";
 import {
-  buyProperty, listProperty, delistProperty,
+  listProperty, delistProperty,
   getPortfolio, getMarketListings, getProperty,
   getAllProperties, getMarketSnapshot, getTotalPassiveIncome,
 } from "./propertyMarket";
-import { startFoxmqBridge, getMeshSnapshot } from "./foxmqBridge";
+import { startFoxmqBridge, getMeshSnapshot, mqPublish, injectGoldCallbacks, injectQuestCallbacks, zoneClaims } from "./foxmqBridge";
 
 // ============================================================
 // INIT
@@ -198,27 +198,45 @@ server.get<{ Params: { playerId: string } }>("/properties/portfolio/:playerId", 
   };
 });
 
-/** Buy a property (agent pays gold from their in-game wallet) */
+/** Buy a property — submits offer through FoxMQ consensus (first-offer-wins ordering) */
 server.post<{ Body: { playerId: string; propertyId: string } }>("/properties/buy", async (req) => {
   const { playerId, propertyId } = req.body as any;
   const player = runtime.players.get(playerId);
   if (!player) return { success: false, error: "Player not found" };
 
-  const result = buyProperty(
-    propertyId,
-    playerId,
-    player.name,
-    player.gold,
-    (id, amount) => { const p = runtime.players.get(id); if (p) p.gold -= amount; },
-    (id, amount) => { const p = runtime.players.get(id); if (p) p.gold += amount; },
-  );
-  return result;
+  const prop = getProperty(propertyId);
+  if (!prop) return { success: false, error: "Property not found" };
+  const price = prop.listedFor ?? prop.def.priceGold;
+  if (player.gold < price) return { success: false, error: `Need ${price}g, have ${player.gold}g` };
+
+  mqPublish("wog/property/offer", {
+    agent:       playerId,
+    buyer_name:  player.name,
+    property_id: propertyId,
+    offer:       price,
+    timestamp:   Date.now(),
+  });
+
+  return { pending: true, message: "Offer submitted via FoxMQ consensus — ownership resolves on ordered delivery" };
 });
 
-/** List a property for sale */
+/** List a property for sale — also publishes to FoxMQ so Python agents can see and bid */
 server.post<{ Body: { playerId: string; propertyId: string; price: number } }>("/properties/list", async (req) => {
   const { playerId, propertyId, price } = req.body as any;
   const ok = listProperty(propertyId, playerId, price);
+  if (ok) {
+    const prop = getProperty(propertyId)!;
+    mqPublish("wog/property/list", {
+      agent:        playerId,
+      property_id:  propertyId,
+      name:         prop.def.name,
+      zone:         prop.def.zone,
+      tier:         prop.def.tier,
+      price,
+      rent_per_tick: prop.def.rentPerTick,
+      timestamp:    Date.now(),
+    });
+  }
   return { success: ok, error: ok ? undefined : "Not owner or invalid price" };
 });
 
@@ -227,6 +245,36 @@ server.post<{ Body: { playerId: string; propertyId: string } }>("/properties/del
   const { playerId, propertyId } = req.body as any;
   const ok = delistProperty(propertyId, playerId);
   return { success: ok };
+});
+
+// ============================================================
+// ZONE CLAIM API — consensus-ordered via FoxMQ
+// ============================================================
+
+/** Current zone claim map — which agent holds each zone */
+server.get("/zone/claims", async () => ({
+  claims: Object.fromEntries(zoneClaims),
+}));
+
+/** Claim a zone (agent asserts dominance — FoxMQ orders competing claims) */
+server.post<{ Body: { playerId: string; zone: string } }>("/zone/claim", async (req, reply) => {
+  const { playerId, zone } = req.body as any;
+  const player = runtime.players.get(playerId);
+  if (!player) return reply.status(404).send({ error: "Player not found" });
+  if (player.zone !== zone) return reply.status(400).send({ error: `Player is in ${player.zone}, not ${zone}` });
+
+  mqPublish("wog/zone/claim", { agent: playerId, zone, timestamp: Date.now() });
+  return { pending: true, message: `Zone claim for "${zone}" submitted — resolves via FoxMQ ordering` };
+});
+
+/** Yield a zone claim (agent voluntarily releases hold) */
+server.post<{ Body: { playerId: string; zone: string } }>("/zone/yield", async (req, reply) => {
+  const { playerId, zone } = req.body as any;
+  const player = runtime.players.get(playerId);
+  if (!player) return reply.status(404).send({ error: "Player not found" });
+
+  mqPublish("wog/zone/yield", { agent: playerId, zone, timestamp: Date.now() });
+  return { pending: true, message: `Zone yield for "${zone}" submitted` };
 });
 
 // ============================================================
@@ -378,7 +426,11 @@ server.post<{ Body: { playerId: string; questId: string } }>("/quests/accept", a
   const player = runtime.players.get(playerId);
   if (!player) return reply.status(404).send({ error: "Player not found" });
   const result = runtime.questManager.acceptQuest(playerId, questId);
-  if (result.success) broadcaster.emit({ type: "quest_accepted", data: { playerId, playerName: player.name, questName: result.questName! } });
+  if (result.success) {
+    broadcaster.emit({ type: "quest_accepted", data: { playerId, playerName: player.name, questName: result.questName! } });
+    // Broadcast to FoxMQ mesh so Python agents see the claim and back off
+    mqPublish("wog/quest/claim", { agent: playerId, quest: questId, timestamp: Date.now() });
+  }
   return result;
 });
 
@@ -392,6 +444,8 @@ server.post<{ Body: { playerId: string; questId: string } }>("/quests/complete",
     player.gold += result.rewards.goldReward;
     for (const id of result.rewards.itemRewards) runtime.addToInventory(player, id, 1);
     broadcaster.emit({ type: "quest_completed", data: { playerId, playerName: player.name, questName: questId, goldReward: result.rewards.goldReward, xpReward: result.rewards.xpReward } });
+    // Release quest claim on FoxMQ mesh — Python agents will see the slot open up
+    mqPublish("wog/quest/abandon", { agent: playerId, quest: questId, timestamp: Date.now() });
     // Mint quest rewards on-chain to the player's wallet
     const wallet = player.wallet;
     if (wallet && result.rewards.goldReward > 0) {
@@ -589,7 +643,10 @@ server.post<{
     case "accept_quest": {
       if (!targetId) return reply.status(400).send({ error: "targetId required (questId)" });
       const result = runtime.questManager.acceptQuest(auth.playerId, targetId);
-      if (result.success) broadcaster.emit({ type: "quest_accepted", data: { playerId: auth.playerId, playerName: player.name, questName: result.questName! } });
+      if (result.success) {
+        broadcaster.emit({ type: "quest_accepted", data: { playerId: auth.playerId, playerName: player.name, questName: result.questName! } });
+        mqPublish("wog/quest/claim", { agent: auth.playerId, quest: targetId, timestamp: Date.now() });
+      }
       return result;
     }
 
@@ -601,6 +658,7 @@ server.post<{
         player.gold += result.rewards.goldReward;
         for (const id of result.rewards.itemRewards) runtime.addToInventory(player, id, 1);
         broadcaster.emit({ type: "quest_completed", data: { playerId: auth.playerId, playerName: player.name, questName: targetId, goldReward: result.rewards.goldReward, xpReward: result.rewards.xpReward } });
+        mqPublish("wog/quest/abandon", { agent: auth.playerId, quest: targetId, timestamp: Date.now() });
         if (player.wallet && result.rewards.goldReward > 0) mintGold(player.wallet, result.rewards.goldReward * 1_000_000).catch(() => {});
         if (player.wallet && result.rewards.xpReward > 0 && player.characterTokenId > 0) awardXP(player.characterTokenId, result.rewards.xpReward).catch(() => {});
       }
@@ -725,12 +783,14 @@ Respond with ONLY JSON: {"action":"attack|move|accept_quest|complete_quest|buy_i
         entry.lastAction = `${d.action} ${d.targetName || ""} — ${d.why}`;
 
         if (d.action === "accept_quest") {
-          runtime.questManager.acceptQuest(playerId, d.targetId);
+          const ar = runtime.questManager.acceptQuest(playerId, d.targetId);
+          if (ar.success) mqPublish("wog/quest/claim", { agent: playerId, quest: d.targetId, timestamp: Date.now() });
         } else if (d.action === "complete_quest") {
           const r = runtime.questManager.completeQuest(playerId, d.targetId);
           if (r.success && r.rewards) {
             player.xp += r.rewards.xpReward; player.gold += r.rewards.goldReward;
             for (const id of r.rewards.itemRewards) runtime.addToInventory(player, id, 1);
+            mqPublish("wog/quest/abandon", { agent: playerId, quest: d.targetId, timestamp: Date.now() });
           }
         } else if (d.action === "buy_item") {
           const t = ITEM_TEMPLATES[parseInt(d.targetId)];
@@ -797,6 +857,17 @@ server.listen({ port: parseInt(process.env.PORT || "3000"), host: "0.0.0.0" }, (
   startHeartbeat();
   // Start FoxMQ bridge (optional — skips gracefully if broker is offline)
   startFoxmqBridge();
+  // Inject player gold functions so FoxMQ consensus handlers can deduct/award gold
+  injectGoldCallbacks(
+    (id, amt) => { const p = runtime.players.get(id); if (p) p.gold -= amt; },
+    (id, amt) => { const p = runtime.players.get(id); if (p) p.gold += amt; },
+    (id)      => runtime.players.get(id)?.gold ?? null,  // null = not shard player, skip gold gate
+  );
+  // Inject quest functions so FoxMQ quest/claim messages execute in the runtime
+  injectQuestCallbacks(
+    (playerId, questId) => runtime.questManager.acceptQuest(playerId, questId),
+    (playerId, questId) => runtime.questManager.abandonQuest(playerId, questId),
+  );
 });
 
 export { server, runtime };
