@@ -14,15 +14,19 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Proxy WS to shard server in dev
+      // Shard server runs on PORT (see shard/.env, default 3001 in this setup).
+      // Proxy WS + the REST endpoints the game/Estate dashboard read from.
       "/ws": {
-        target: "ws://localhost:3000",
+        target: "ws://localhost:3001",
         ws: true,
       },
-      // Proxy REST endpoints the Estate dashboard reads from
-      "/properties": { target: "http://localhost:3000", changeOrigin: true },
-      "/foxmq":      { target: "http://localhost:3000", changeOrigin: true },
-      "/agent":      { target: "http://localhost:3000", changeOrigin: true },
+      "/properties": { target: "http://localhost:3001", changeOrigin: true },
+      "/foxmq":      { target: "http://localhost:3001", changeOrigin: true },
+      "/agent":      { target: "http://localhost:3001", changeOrigin: true },
+      "/state":      { target: "http://localhost:3001", changeOrigin: true },
+      "/zone":       { target: "http://localhost:3001", changeOrigin: true },
+      "/ai":         { target: "http://localhost:3001", changeOrigin: true },
+      "/health":     { target: "http://localhost:3001", changeOrigin: true },
     },
   },
 });

@@ -457,13 +457,21 @@ Respond with ONLY a JSON array, one object per agent, in the SAME ORDER as liste
   }
 
   // Parse all decisions from the response
+  if (process.env.LLM_DEBUG === "1") {
+    console.log(`🧠 LLM raw (${text.length} chars):`, JSON.stringify(text.slice(0, 300)));
+  }
   const matches = text.matchAll(/\{[^{}]+\}/g);
   for (const match of matches) {
     try {
       const decision = JSON.parse(match[0]) as Decision;
-      const idx = agents.findIndex(a => a.id === decision.agentId);
+      // Models may return the agent's id ("agent-0") OR its display name
+      // ("Ragnar") in agentId — match on either, case-insensitively.
+      const want = String(decision.agentId ?? "").toLowerCase();
+      const idx = agents.findIndex(
+        a => a.id.toLowerCase() === want || a.name.toLowerCase() === want,
+      );
       if (idx !== -1) {
-        decisions[idx] = decision;
+        decisions[idx] = { ...decision, agentId: agents[idx].id };
       }
     } catch {
       // Malformed JSON chunk — skip
