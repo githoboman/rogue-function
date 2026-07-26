@@ -25,7 +25,7 @@
     .topbar-left { display: flex; align-items: center; gap: 16px; }
     #topbar h1 {
       font-size: 12px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase;
-      background: linear-gradient(135deg, #e8c860 0%, #c8a84b 50%, #a88a30 100%);
+      background: linear-gradient(135deg, #5eeae2 0%, #38e0d8 50%, #1fb8b0 100%);
       -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     }
     .topbar-stats { display: flex; gap: 14px; font-size: 10px; color: #4a4a5a; font-weight: 500; }
@@ -56,6 +56,15 @@
     #ai-toggle:hover { filter: brightness(1.25); transform: translateY(-1px); }
     #ai-toggle:active { transform: translateY(0); }
 
+    #estate-hq-btn {
+      font-size: 10px; padding: 6px 14px; border-radius: 8px; font-weight: 800;
+      cursor: pointer; transition: all 0.2s ease; font-family: 'Outfit', sans-serif;
+      letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; text-transform: uppercase;
+      color: #38e0d8; background: rgba(56,224,216,0.08); border: 1px solid rgba(56,224,216,0.32);
+    }
+    #estate-hq-btn:hover { background: rgba(56,224,216,0.16); box-shadow: 0 0 14px rgba(56,224,216,0.25); transform: translateY(-1px); }
+    #estate-hq-btn:active { transform: translateY(0); }
+
     /* ── Game Area (full width) ────────────────────────── */
     #game-container {
       flex: 1; position: relative; overflow: hidden; background: #1a2a18;
@@ -71,9 +80,9 @@
     }
     .zone-tab:hover { color: #9999aa; border-color: rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); }
     .zone-tab.active {
-      color: #e8c860; border-color: rgba(200,168,75,0.4);
-      background: radial-gradient(ellipse at center, rgba(200,168,75,0.15) 0%, rgba(200,168,75,0.04) 100%);
-      box-shadow: 0 0 16px rgba(200,168,75,0.15);
+      color: #5eeae2; border-color: rgba(56,224,216,0.4);
+      background: radial-gradient(ellipse at center, rgba(56,224,216,0.15) 0%, rgba(56,224,216,0.04) 100%);
+      box-shadow: 0 0 16px rgba(56,224,216,0.15);
     }
 
     /* ── Bottom Nav Bar ────────────────────────────────── */
@@ -81,7 +90,7 @@
       display: flex; align-items: stretch; justify-content: center;
       height: 58px; flex-shrink: 0; gap: 2px; padding: 6px 8px;
       background: rgba(6,6,12,0.98);
-      border-top: 1px solid rgba(200,168,75,0.07);
+      border-top: 1px solid rgba(56,224,216,0.07);
       backdrop-filter: blur(20px); z-index: 100;
     }
     .nav-tab {
@@ -90,10 +99,10 @@
       transition: background 0.18s ease; position: relative; user-select: none;
       border: 1px solid transparent;
     }
-    .nav-tab:hover { background: rgba(200,168,75,0.05); }
+    .nav-tab:hover { background: rgba(56,224,216,0.05); }
     .nav-tab.active {
-      background: linear-gradient(160deg, rgba(200,168,75,0.14) 0%, rgba(200,168,75,0.05) 100%);
-      border-color: rgba(200,168,75,0.12);
+      background: linear-gradient(160deg, rgba(56,224,216,0.14) 0%, rgba(56,224,216,0.05) 100%);
+      border-color: rgba(56,224,216,0.12);
     }
     /* SVG icon slot */
     .nav-tab-icon {
@@ -108,26 +117,26 @@
     }
     .nav-tab:hover .nav-tab-icon svg { fill: #9090a8; }
     .nav-tab.active .nav-tab-icon svg {
-      fill: #c8a84b;
-      filter: drop-shadow(0 0 4px rgba(200,168,75,0.5));
+      fill: #38e0d8;
+      filter: drop-shadow(0 0 4px rgba(56,224,216,0.5));
     }
     /* Active indicator dot under icon */
     .nav-tab.active .nav-tab-icon::after {
       content: ''; position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%);
       width: 4px; height: 4px; border-radius: 50%;
-      background: #c8a84b; box-shadow: 0 0 8px rgba(200,168,75,0.7);
+      background: #38e0d8; box-shadow: 0 0 8px rgba(56,224,216,0.7);
     }
     .nav-tab-label {
       font-size: 8.5px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
       color: #555566; transition: color 0.18s; line-height: 1;
     }
     .nav-tab:hover .nav-tab-label { color: #9090a8; }
-    .nav-tab.active .nav-tab-label { color: #c8a84b; }
+    .nav-tab.active .nav-tab-label { color: #38e0d8; }
     .nav-badge {
       position: absolute; top: 1px; right: 6px;
-      background: rgba(200,168,75,0.18); color: #c8a84b;
+      background: rgba(56,224,216,0.18); color: #38e0d8;
       padding: 1px 5px; border-radius: 6px;
-      font-size: 7.5px; font-weight: 800; border: 1px solid rgba(200,168,75,0.2);
+      font-size: 7.5px; font-weight: 800; border: 1px solid rgba(56,224,216,0.2);
       line-height: 1.4; letter-spacing: 0.3px;
     }
     .nav-badge.blue { background: rgba(100,160,255,0.15); color: #64a0ff; border-color: rgba(100,160,255,0.2); }
@@ -199,9 +208,9 @@
     .agent-name { font-size: 13px; font-weight: 700; color: #e8e0d4; }
     .agent-class-tag { font-size: 9px; color: #5a5a6a; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; }
     .agent-level {
-      font-size: 11px; color: #c8a84b; font-weight: 800;
-      background: linear-gradient(135deg, rgba(200,168,75,0.15) 0%, rgba(200,168,75,0.06) 100%);
-      padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(200,168,75,0.12);
+      font-size: 11px; color: #38e0d8; font-weight: 800;
+      background: linear-gradient(135deg, rgba(56,224,216,0.15) 0%, rgba(56,224,216,0.06) 100%);
+      padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(56,224,216,0.12);
     }
     .agent-zone-tag {
       font-size: 9px; color: #3a3a4a; margin: 4px 0 8px 44px; font-weight: 500;
@@ -225,7 +234,7 @@
       border-top: 1px solid rgba(255,255,255,0.03); font-weight: 600;
     }
     .agent-stats-row span { display: flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,0.02); }
-    .stat-gold { color: #c8a84b; }
+    .stat-gold { color: #38e0d8; }
     .stat-quests { color: #6aaa6a; }
 
     .agent-action {
@@ -242,7 +251,7 @@
       background: linear-gradient(135deg, rgba(18,18,28,0.7) 0%, rgba(14,14,22,0.5) 100%);
       border: 1px solid rgba(255,255,255,0.03); transition: all 0.25s ease;
     }
-    .earnings-row:hover { border-color: rgba(200,168,75,0.08); transform: translateX(2px); }
+    .earnings-row:hover { border-color: rgba(56,224,216,0.08); transform: translateX(2px); }
     .earnings-rank { width: 24px; font-size: 14px; font-weight: 800; text-align: center; flex-shrink: 0; color: #3a3a4a; }
     .earnings-rank.top1 { color: #ffd700; text-shadow: 0 0 8px rgba(255,215,0,0.3); }
     .earnings-rank.top2 { color: #c0c0c0; }
@@ -257,16 +266,16 @@
     .earnings-detail { font-size: 9px; color: #4a4a5a; margin-top: 3px; font-weight: 500; display: flex; gap: 8px; }
     .earnings-detail-item { display: flex; align-items: center; gap: 3px; }
     .earnings-values { text-align: right; flex-shrink: 0; }
-    .earnings-gold { font-size: 15px; font-weight: 800; color: #c8a84b; font-variant-numeric: tabular-nums; font-family: 'Courier New', monospace; }
+    .earnings-gold { font-size: 15px; font-weight: 800; color: #38e0d8; font-variant-numeric: tabular-nums; font-family: 'Courier New', monospace; }
     .earnings-xp { font-size: 10px; color: #6677bb; margin-top: 2px; font-variant-numeric: tabular-nums; font-family: 'Courier New', monospace; }
     .earnings-total {
       display: flex; justify-content: space-between; align-items: center;
       padding: 12px 16px; margin: 8px 0 4px; font-size: 10px; border-radius: 10px;
-      background: linear-gradient(135deg, rgba(200,168,75,0.08) 0%, rgba(200,168,75,0.02) 100%);
-      border: 1px solid rgba(200,168,75,0.08);
+      background: linear-gradient(135deg, rgba(56,224,216,0.08) 0%, rgba(56,224,216,0.02) 100%);
+      border: 1px solid rgba(56,224,216,0.08);
     }
     .earnings-total-label { color: #6a6a7a; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
-    .earnings-total-val { color: #c8a84b; font-weight: 800; font-family: 'Courier New', monospace; font-size: 16px; }
+    .earnings-total-val { color: #38e0d8; font-weight: 800; font-family: 'Courier New', monospace; font-size: 16px; }
 
     /* ── Leaderboard ───────────────────────────────────── */
     #leaderboard-list { padding: 8px 12px; }
@@ -278,7 +287,7 @@
     }
     .lb-row:hover { border-color: rgba(255,255,255,0.06); }
     .lb-row.first {
-      background: linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(200,168,75,0.02) 100%);
+      background: linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(56,224,216,0.02) 100%);
       border-color: rgba(255,215,0,0.1);
     }
     .lb-rank { width: 28px; text-align: center; font-weight: 800; font-size: 14px; flex-shrink: 0; }
@@ -295,7 +304,7 @@
     .lb-name { font-weight: 700; color: #c0b8a8; font-size: 12px; }
     .lb-class { font-size: 9px; color: #4a4a5a; font-weight: 500; margin-top: 1px; }
     .lb-score-col { text-align: right; flex-shrink: 0; }
-    .lb-score { font-weight: 800; color: #c8a84b; font-family: 'Courier New', monospace; font-size: 15px; font-variant-numeric: tabular-nums; }
+    .lb-score { font-weight: 800; color: #38e0d8; font-family: 'Courier New', monospace; font-size: 15px; font-variant-numeric: tabular-nums; }
     .lb-breakdown { font-size: 9px; color: #4a4a5a; margin-top: 1px; font-family: 'Courier New', monospace; }
 
     /* ── Event Log ─────────────────────────────────────── */
@@ -324,9 +333,9 @@
     #join-section { padding: 20px 20px 16px; max-width: 420px; }
     #join-section h3 {
       font-size: 10px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;
-      color: #c8a84b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+      color: #38e0d8; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
     }
-    #join-section h3::after { content:''; flex:1; height:1px; background: linear-gradient(90deg,rgba(200,168,75,0.2),transparent); }
+    #join-section h3::after { content:''; flex:1; height:1px; background: linear-gradient(90deg,rgba(56,224,216,0.2),transparent); }
     #join-form { display: flex; flex-direction: column; gap: 10px; }
     .form-group { display: flex; flex-direction: column; gap: 4px; }
     #join-form label {
@@ -343,26 +352,26 @@
       background-repeat: no-repeat; background-position: right 12px center;
     }
     #join-form input:focus, #join-form select:focus {
-      border-color: rgba(200,168,75,0.35);
-      box-shadow: 0 0 0 3px rgba(200,168,75,0.05), 0 0 12px rgba(200,168,75,0.04);
+      border-color: rgba(56,224,216,0.35);
+      box-shadow: 0 0 0 3px rgba(56,224,216,0.05), 0 0 12px rgba(56,224,216,0.04);
       background: rgba(12,12,22,0.95);
     }
     #join-form input::placeholder { color: #252532; }
     .form-hint { font-size: 9px; color: #252532; margin-top: 1px; }
     #join-btn {
-      background: linear-gradient(135deg, #e0bc58 0%, #c8a84b 60%, #b09038 100%);
+      background: linear-gradient(135deg, #e0bc58 0%, #38e0d8 60%, #b09038 100%);
       color: #06060c; border: none; padding: 12px 20px;
       font-family: 'Inter', system-ui, sans-serif;
       font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;
       cursor: pointer; border-radius: 8px; transition: all 0.22s ease; margin-top: 6px;
-      box-shadow: 0 2px 12px rgba(200,168,75,0.18), 0 0 0 1px rgba(200,168,75,0.1);
+      box-shadow: 0 2px 12px rgba(56,224,216,0.18), 0 0 0 1px rgba(56,224,216,0.1);
       display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
     }
     #join-btn:hover {
-      background: linear-gradient(135deg, #eece68 0%, #d4b452 60%, #c8a84b 100%);
-      transform: translateY(-2px); box-shadow: 0 6px 20px rgba(200,168,75,0.28);
+      background: linear-gradient(135deg, #eece68 0%, #d4b452 60%, #38e0d8 100%);
+      transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56,224,216,0.28);
     }
-    #join-btn:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(200,168,75,0.15); }
+    #join-btn:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(56,224,216,0.15); }
     #join-btn:disabled {
       background: rgba(20,20,32,0.9); color: #2a2a3a; cursor: not-allowed;
       transform: none; box-shadow: none; border: 1px solid rgba(255,255,255,0.04);
@@ -377,7 +386,7 @@
       border: 1px solid rgba(68,204,102,0.12);
     }
     .agent-active-name { font-size: 13px; font-weight: 700; color: #44cc66; margin-bottom: 4px; }
-    .agent-active-wallet { font-size: 10px; color: #c8a84b; margin-bottom: 2px; }
+    .agent-active-wallet { font-size: 10px; color: #38e0d8; margin-bottom: 2px; }
     .agent-active-status { font-size: 9px; color: #2a4a3a; font-style: italic; }
 
     /* ── Anime.js DOM overlay: damage numbers, float labels, banners ── */
@@ -462,6 +471,10 @@
     </div>
     <div class="topbar-right">
       <span id="tick-count"></span>
+      <button id="estate-hq-btn" onclick="openEstateDashboard()" title="Open the Estate Panels dashboard">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 2 10h3v11a1 1 0 001 1h4v-7h4v7h4a1 1 0 001-1V10h3L12 2z"/></svg>
+        <span>Estate HQ</span>
+      </button>
       <button id="ai-toggle" class="active" onclick="toggleAI()">
         <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 1v2M6 9v2M1 6h2M9 6h2M2.5 2.5l1.5 1.5M8 8l1.5 1.5M8 4l1.5-1.5M2.5 9.5L4 8"/><circle cx="6" cy="6" r="2"/></svg>
         <span id="ai-status-text">AI: ON</span>
@@ -503,14 +516,14 @@
       <div id="panel-leaderboard" class="panel-view" style="display:none"><div id="leaderboard-list"></div></div>
       <div id="panel-log" class="panel-view" style="display:none"><div id="event-log"></div></div>
       <div id="panel-estate" class="panel-view" style="display:none">
-        <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.05);background:radial-gradient(ellipse at top right, rgba(200,168,75,0.08), transparent 60%)">
+        <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.05);background:radial-gradient(ellipse at top right, rgba(56,224,216,0.08), transparent 60%)">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <span style="font-size:12px;font-family:'Outfit',sans-serif;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#c8a84b;text-shadow:0 0 12px rgba(200,168,75,0.3)">Property Market</span>
+            <span style="font-size:12px;font-family:'Outfit',sans-serif;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#38e0d8;text-shadow:0 0 12px rgba(56,224,216,0.3)">Property Market</span>
             <span id="estate-market-count" style="font-size:10px;color:#8a8a9a">Loading...</span>
           </div>
           <div style="display:flex;gap:16px;font-size:10px">
-            <span>Total passive: <b id="estate-total-passive" style="color:#e8c860">0g/tick</b></span>
-            <span>Properties owned: <b id="estate-owned-count" style="color:#c8a84b">0</b></span>
+            <span>Total passive: <b id="estate-total-passive" style="color:#5eeae2">0g/tick</b></span>
+            <span>Properties owned: <b id="estate-owned-count" style="color:#38e0d8">0</b></span>
             <span>Listed for sale: <b id="estate-listed-count" style="color:#8a8a9a">0</b></span>
           </div>
         </div>
@@ -816,7 +829,7 @@
 
     // ── Estate Panel ──────────────────────────────────────────
     const TIER_NAMES = ['', 'Cottage', 'House', 'Manor', 'Castle', 'Palace'];
-    const TIER_COLORS = ['', '#8a8a9a', '#6a9a6a', '#4a8aba', '#c8a84b', '#e84b8a'];
+    const TIER_COLORS = ['', '#8a8a9a', '#6a9a6a', '#4a8aba', '#38e0d8', '#e84b8a'];
 
     async function loadEstatePanel() {
       try {
@@ -857,7 +870,7 @@
                 <div style="font-size:9px;color:#5a5a6a;margin-top:2px">${p.zone}</div>
               </div>
               <div style="text-align:right">
-                <div style="font-size:11px;font-weight:700;color:#c8a84b;font-family:'Outfit',sans-serif">+${p.rentPerTick}g/tick</div>
+                <div style="font-size:11px;font-weight:700;color:#38e0d8;font-family:'Outfit',sans-serif">+${p.rentPerTick}g/tick</div>
                 ${p.listedFor ? `<div style="font-size:9px;color:#ff5555">Listed: ${p.listedFor}g</div>` : ''}
               </div>
             </div>`).join('');
@@ -865,7 +878,7 @@
             <div style="padding:16px;border-radius:16px;border:1px solid rgba(255,255,255,0.05);background:linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));box-shadow: 0 4px 20px rgba(0,0,0,0.2)">
               <div style="display:flex;justify-content:space-between;margin-bottom:6px">
                 <span style="font-size:12px;font-weight:700;color:#d8cfc0;font-family:'Outfit',sans-serif">${owner}</span>
-                <span style="font-size:11px;color:#e8c860;font-weight:700;font-family:'Outfit',sans-serif">+${income}g/tick</span>
+                <span style="font-size:11px;color:#5eeae2;font-weight:700;font-family:'Outfit',sans-serif">+${income}g/tick</span>
               </div>
               ${items}
             </div>`;
@@ -878,11 +891,11 @@
           <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;margin:3px 0;border-radius:8px;background:rgba(16,16,26,0.8);border:1px solid rgba(255,255,255,0.04)">
             <div>
               <span style="font-size:10px;color:#c8c8d8;font-weight:600">${l.name}</span>
-              <span style="font-size:9px;margin-left:8px;padding:2px 6px;border-radius:4px;background:rgba(200,168,75,0.1);color:#c8a84b">${TIER_NAMES[l.tier] || ''}</span>
+              <span style="font-size:9px;margin-left:8px;padding:2px 6px;border-radius:4px;background:rgba(56,224,216,0.1);color:#38e0d8">${TIER_NAMES[l.tier] || ''}</span>
               <div style="font-size:9px;color:#4a4a5a;margin-top:2px">${l.zone} · Seller: ${l.ownerName} · Yield: ${l.rentPerTick}g/tick</div>
             </div>
             <div style="text-align:right">
-              <div style="font-size:11px;font-weight:700;color:#e8c860">${l.askingPrice}g</div>
+              <div style="font-size:11px;font-weight:700;color:#5eeae2">${l.askingPrice}g</div>
             </div>
           </div>`).join('')
           : '<div style="padding:12px;font-size:10px;color:#3a3a4a">No properties listed for sale</div>';
@@ -962,7 +975,7 @@
               <div style="background:linear-gradient(90deg,#2d8c3e,#4caf50);height:3px;border-radius:2px;width:${hpPct}%"></div>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:9px;color:#4a4a5a">
-              <span style="color:#c8a84b">${a.gold}g</span>
+              <span style="color:#38e0d8">${a.gold}g</span>
               <span style="color:#64a0ff">${a.properties.length} props</span>
               <span style="color:#6ad0a0">+${a.passiveIncome}g/tick</span>
             </div>
@@ -1026,5 +1039,322 @@
     setInterval(() => { if (currentPanel === 'mesh') loadMeshPanel(); }, 5000);
   </script>
   <script type="module" src="/src/main.ts"></script>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- ESTATE DASHBOARD — fullscreen overlay (opened from topbar HQ)   -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <style>
+    #estate-dashboard-overlay {
+      position: fixed; inset: 0; z-index: 500; display: none;
+      background:
+        radial-gradient(ellipse 120% 80% at 50% -10%, rgba(30,60,70,0.5) 0%, transparent 55%),
+        radial-gradient(ellipse 80% 60% at 100% 100%, rgba(20,44,52,0.4) 0%, transparent 50%),
+        #060a12;
+      overflow-y: auto;
+    }
+    #estate-dashboard-overlay.open { display: block; }
+    .edb-app { display: grid; grid-template-columns: 232px 1fr; gap: 22px; max-width: 1200px; margin: 0 auto; padding: 22px 26px 40px; min-height: 100vh; }
+    .edb-sidebar { background: linear-gradient(180deg, rgba(14,22,32,0.9), rgba(10,16,24,0.85)); border: 1px solid rgba(120,200,210,0.10); border-radius: 20px; padding: 22px 16px; display: flex; flex-direction: column; position: sticky; top: 22px; height: fit-content; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+    .edb-brand { font-size: 18px; font-weight: 800; letter-spacing: 1px; padding: 0 10px 22px; display: flex; align-items: center; gap: 8px; font-family: 'Outfit'; }
+    .edb-brand .dot { width: 7px; height: 7px; border-radius: 50%; background: #38e0d8; box-shadow: 0 0 10px rgba(56,224,216,0.5); }
+    .edb-brand .t { color: #38e0d8; } .edb-brand .p { color: #e8f0f2; }
+    .edb-nav-item { display: flex; align-items: center; gap: 13px; padding: 11px 14px; border-radius: 12px; cursor: pointer; color: #7a8a92; font-size: 14px; font-weight: 600; transition: all 0.18s; margin-bottom: 3px; position: relative; border: 1px solid transparent; font-family: 'Inter'; }
+    .edb-nav-item svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; flex-shrink: 0; }
+    .edb-nav-item:hover { color: #e8f0f2; background: rgba(56,224,216,0.05); }
+    .edb-nav-item.active { color: #38e0d8; background: linear-gradient(100deg, rgba(56,224,216,0.16), rgba(56,224,216,0.04)); border-color: rgba(56,224,216,0.22); }
+    .edb-nav-item.active::before { content:''; position:absolute; left:-16px; top:50%; transform:translateY(-50%); width:3px; height:22px; border-radius:2px; background:#38e0d8; box-shadow:0 0 10px rgba(56,224,216,0.5); }
+    .edb-nav-badge { margin-left:auto; font-size:11px; font-weight:700; background:rgba(120,200,210,0.08); border-radius:20px; padding:2px 9px; }
+    .edb-nav-item.active .edb-nav-badge { color:#38e0d8; background:rgba(56,224,216,0.12); }
+    .edb-main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+    .edb-topbar { display: flex; align-items: center; gap: 16px; background: rgba(16,24,34,0.72); border: 1px solid rgba(120,200,210,0.10); border-radius: 16px; padding: 13px 20px; }
+    .edb-close { margin-left:auto; width:34px; height:34px; border-radius:10px; background:rgba(56,224,216,0.06); border:1px solid rgba(120,200,210,0.14); color:#7a8a92; cursor:pointer; font-size:18px; display:flex; align-items:center; justify-content:center; }
+    .edb-close:hover { color:#e8f0f2; background:rgba(56,224,216,0.14); }
+    .edb-lord { display:flex; align-items:center; gap:11px; }
+    .edb-lord .av { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,#2a5a62,#1a3a42); border:1px solid rgba(120,220,230,0.28); display:flex; align-items:center; justify-content:center; font-size:16px; }
+    .edb-lord .nm { font-size:14px; font-weight:700; font-family:'Outfit'; } .edb-lord .sub { font-size:10px; color:#7a8a92; }
+    .edb-cur { display:flex; align-items:center; gap:7px; font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; }
+    .edb-cur .c { width:17px; height:17px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; }
+    .edb-cur .c.g { background:radial-gradient(circle at 35% 30%,#f5d67a,#b8901f); color:#5a3d00; }
+    .edb-cur .c.d { background:radial-gradient(circle at 35% 30%,#b8ecff,#4aa8d8); color:#06304a; }
+    .edb-cur .lbl { color:#7a8a92; font-weight:500; }
+    .edb-stat-row { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+    .edb-tile { background:rgba(16,24,34,0.72); border:1px solid rgba(120,200,210,0.10); border-radius:16px; padding:16px 18px; position:relative; }
+    .edb-tile .lbl { font-size:10.5px; letter-spacing:1.2px; text-transform:uppercase; color:#7a8a92; font-weight:600; }
+    .edb-tile .val { font-size:27px; font-weight:800; margin-top:8px; display:flex; align-items:baseline; gap:6px; font-family:'Outfit'; font-variant-numeric:tabular-nums; }
+    .edb-tile .val .u { font-size:12px; color:#7a8a92; font-weight:600; } .edb-tile .val .gi { color:#e6c25a; font-size:20px; }
+    .edb-tile .s { font-size:11px; color:#7a8a92; margin-top:5px; } .edb-tile .s .up { color:#38e0d8; font-weight:700; }
+    .edb-split { display:flex; gap:26px; margin-top:8px; }
+    .edb-split .n { font-size:27px; font-weight:800; font-family:'Outfit'; font-variant-numeric:tabular-nums; } .edb-split .n.dim { color:#7a8a92; }
+    .edb-split .cap { font-size:10px; color:#7a8a92; text-transform:uppercase; margin-top:2px; }
+    .edb-content { display:grid; grid-template-columns:1fr 300px; gap:18px; align-items:start; }
+    .edb-sec-title { font-size:12px; letter-spacing:1.5px; text-transform:uppercase; color:#7a8a92; font-weight:700; margin-bottom:12px; }
+    .edb-proplist { display:flex; flex-direction:column; gap:12px; }
+    .edb-prop { display:flex; gap:14px; align-items:center; background:rgba(16,24,34,0.72); border:1px solid rgba(120,200,210,0.10); border-radius:14px; padding:12px; transition:all 0.2s; }
+    .edb-prop:hover { border-color:rgba(120,220,230,0.28); transform:translateX(2px); }
+    .edb-prop.feat { border-color:rgba(56,224,216,0.3); box-shadow:0 0 24px rgba(56,224,216,0.07); }
+    .edb-thumb { width:88px; height:68px; border-radius:10px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:30px; border:1px solid rgba(120,200,210,0.10); }
+    .edb-thumb.t1{background:linear-gradient(150deg,#2a3a2e,#1a2a1e);} .edb-thumb.t2{background:linear-gradient(150deg,#3a3020,#241c12);} .edb-thumb.t3{background:linear-gradient(150deg,#2a2440,#181228);} .edb-thumb.t4{background:linear-gradient(150deg,#402028,#281016);}
+    .edb-pinfo{flex:1;min-width:0;} .edb-phead{display:flex;align-items:center;gap:8px;}
+    .edb-pname{font-size:15px;font-weight:700;font-family:'Outfit';}
+    .edb-pstyle{margin-left:auto;font-size:10px;font-weight:600;color:#38e0d8;background:rgba(56,224,216,0.1);border:1px solid rgba(56,224,216,0.18);border-radius:8px;padding:2px 8px;}
+    .edb-tbadge{font-size:9px;font-weight:700;padding:1px 7px;border-radius:6px;background:rgba(120,200,210,0.1);color:#7a8a92;}
+    .edb-pmeta{font-size:11.5px;color:#7a8a92;margin-top:5px;line-height:1.6;} .edb-pmeta b{color:#e8f0f2;} .edb-pmeta .gld{color:#e6c25a;font-weight:600;}
+    .edb-manage{margin-top:8px;font-size:11px;font-weight:600;color:#38e0d8;background:rgba(56,224,216,0.08);border:1px solid rgba(56,224,216,0.25);border-radius:9px;padding:6px 16px;cursor:pointer;font-family:'Inter';}
+    .edb-manage:hover{background:rgba(56,224,216,0.16);}
+    .edb-side{display:flex;flex-direction:column;gap:16px;}
+    .edb-chart{background:rgba(16,24,34,0.72);border:1px solid rgba(120,200,210,0.10);border-radius:16px;padding:16px;}
+    .edb-chart h3{font-size:13px;font-weight:700;font-family:'Outfit';} .edb-chart .cs{font-size:10.5px;color:#7a8a92;margin-top:2px;margin-bottom:12px;}
+    .edb-chart svg.spark{width:100%;height:90px;display:block;overflow:visible;}
+    .edb-axis{font-size:8.5px;fill:#4a5860;}
+    .edb-donut-wrap{display:flex;align-items:center;gap:16px;} .edb-donut{width:108px;height:108px;flex-shrink:0;}
+    .edb-legend{display:flex;flex-direction:column;gap:9px;flex:1;} .edb-li{display:flex;align-items:center;gap:8px;font-size:11.5px;}
+    .edb-ld{width:9px;height:9px;border-radius:3px;flex-shrink:0;} .edb-ln{color:#7a8a92;} .edb-lp{margin-left:auto;font-weight:700;}
+    .edb-agrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+    .edb-ac{background:rgba(16,24,34,0.72);border:1px solid rgba(120,200,210,0.10);border-radius:16px;padding:16px;}
+    .edb-ac.legendary{border-color:rgba(230,194,90,0.35);box-shadow:0 0 26px rgba(230,194,90,0.08);} .edb-ac.epic{border-color:rgba(181,124,224,0.3);} .edb-ac.rare{border-color:rgba(90,160,230,0.28);}
+    .edb-atop{display:flex;align-items:center;gap:11px;}
+    .edb-aav{width:42px;height:42px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px;border:1px solid rgba(120,220,230,0.28);}
+    .edb-aav.legendary{background:linear-gradient(140deg,#4a3a18,#2e2410);} .edb-aav.epic{background:linear-gradient(140deg,#3a2450,#241432);} .edb-aav.rare{background:linear-gradient(140deg,#1e3450,#122032);}
+    .edb-anm{font-size:15px;font-weight:700;font-family:'Outfit';} .edb-ar{font-size:11px;font-weight:600;margin-top:1px;}
+    .edb-ar.legendary{color:#e6c25a;} .edb-ar.epic{color:#b57ce0;} .edb-ar.rare{color:#5aa0e6;}
+    .edb-acrown{margin-left:auto;font-size:14px;}
+    .edb-arows{margin-top:13px;display:flex;flex-direction:column;gap:7px;font-size:11.5px;}
+    .edb-arow{display:flex;align-items:baseline;gap:6px;} .edb-arow .k{color:#7a8a92;min-width:52px;} .edb-arow .v{color:#e8f0f2;font-weight:600;} .edb-arow .v.rk{margin-left:auto;}
+    .edb-asucc{margin-top:13px;} .edb-asl{display:flex;justify-content:space-between;font-size:11px;margin-bottom:5px;} .edb-asl .p{font-weight:700;}
+    .edb-bar{height:6px;border-radius:4px;background:rgba(120,200,210,0.08);overflow:hidden;} .edb-bar .f{height:100%;border-radius:4px;transition:width 0.6s;}
+    .edb-bar .f.legendary{background:linear-gradient(90deg,#c0a030,#e6c25a);} .edb-bar .f.epic{background:linear-gradient(90deg,#8a5ac0,#b57ce0);} .edb-bar .f.rare{background:linear-gradient(90deg,#3a70c0,#5aa0e6);}
+    .edb-view{margin-top:13px;width:100%;font-size:12px;font-weight:600;color:#38e0d8;background:rgba(56,224,216,0.08);border:1px solid rgba(56,224,216,0.22);border-radius:10px;padding:8px;cursor:pointer;font-family:'Inter';}
+    .edb-view:hover{background:rgba(56,224,216,0.15);}
+    .edb-live{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:#38e0d8;letter-spacing:0.5px;}
+    .edb-live .pl{width:7px;height:7px;border-radius:50%;background:#38e0d8;box-shadow:0 0 8px rgba(56,224,216,0.5);animation:edbpulse 1.6s ease-in-out infinite;}
+    @keyframes edbpulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
+    @media (max-width:980px){ .edb-app{grid-template-columns:1fr;} .edb-content{grid-template-columns:1fr;} .edb-agrid{grid-template-columns:1fr;} }
+  </style>
+
+  <div id="estate-dashboard-overlay">
+    <div class="edb-app">
+      <aside class="edb-sidebar">
+        <div class="edb-brand"><span class="dot"></span><span class="t">ESTATE</span>&nbsp;<span class="p">PANELS</span></div>
+        <nav id="edb-nav">
+          <div class="edb-nav-item active" data-view="dashboard"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Dashboard</span></div>
+          <div class="edb-nav-item" data-view="properties"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg><span>Properties</span><span class="edb-nav-badge" id="edb-nav-props">0</span></div>
+          <div class="edb-nav-item" data-view="agents"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/></svg><span>Agents</span><span class="edb-nav-badge" id="edb-nav-agents">0</span></div>
+          <div class="edb-nav-item" data-view="income"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-9"/><path d="M16 3h5v5"/></svg><span>Income</span></div>
+          <div class="edb-nav-item" data-view="market"><svg viewBox="0 0 24 24"><path d="M6 6h15l-1.5 9h-12z"/><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M6 6 5 3H2"/></svg><span>Market</span></div>
+          <div class="edb-nav-item" data-view="upgrades"><svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="m7 8 5-5 5 5"/></svg><span>Upgrades</span></div>
+          <div class="edb-nav-item" data-view="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.17V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 3.6 14H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 5 8.6a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 10 3.6V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 2.82 1.17l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 20.4 10H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Settings</span></div>
+        </nav>
+        <div style="margin-top:auto;padding:16px 10px 0"><div class="edb-live"><span class="pl"></span><span id="edb-conn">CONNECTING</span></div></div>
+      </aside>
+      <div class="edb-main">
+        <div class="edb-topbar">
+          <div class="edb-lord"><div class="av">🦊</div><div><div class="nm">The Realm Ledger</div><div class="sub">World of Guilds · Autonomous Economy</div></div></div>
+          <div class="edb-cur"><span class="c g">G</span><span id="edb-gold">0</span><span class="lbl">Gold</span></div>
+          <div class="edb-cur"><span class="c d">◆</span><span id="edb-diamonds">0</span><span class="lbl">Diamonds</span></div>
+          <button class="edb-close" onclick="closeEstateDashboard()" title="Back to game">✕</button>
+        </div>
+        <div class="edb-stat-row">
+          <div class="edb-tile"><div class="lbl">Total Passive Income</div><div class="val"><span class="gi">G</span><span id="edb-passive">0</span><span class="u">/tick</span></div><div class="s">Gold trend <span class="up" id="edb-trend">+0%</span></div></div>
+          <div class="edb-tile"><div class="lbl">Total Properties</div><div class="edb-split"><div><div class="n" id="edb-owned">0</div><div class="cap">Owned</div></div><div><div class="n dim" id="edb-available">0</div><div class="cap">Available</div></div></div></div>
+          <div class="edb-tile"><div class="lbl">Total Agents</div><div class="edb-split"><div><div class="n" id="edb-agents-emp">0</div><div class="cap">Employed</div></div><div><div class="n dim" id="edb-agents-act">0</div><div class="cap">Active</div></div></div></div>
+        </div>
+        <div class="edb-content">
+          <div>
+            <div class="edb-sec-title" id="edb-list-title">Current Properties</div>
+            <div class="edb-proplist" id="edb-proplist"></div>
+          </div>
+          <div class="edb-side" id="edb-side">
+            <div class="edb-chart"><h3>Passive Income</h3><div class="cs">Gold earned, recent ticks</div><svg class="spark" id="edb-spark" viewBox="0 0 260 100" preserveAspectRatio="none"></svg></div>
+            <div class="edb-chart"><h3>Income Sources</h3><div class="cs" style="margin-bottom:14px">By property tier</div><div class="edb-donut-wrap"><svg class="edb-donut" id="edb-donut" viewBox="0 0 42 42"></svg><div class="edb-legend" id="edb-donut-legend"></div></div></div>
+          </div>
+        </div>
+        <div class="agents-section">
+          <div class="edb-sec-title">Agent Portfolios</div>
+          <div class="edb-agrid" id="edb-agrid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    // ── Estate dashboard: reuses the game's live shard data. ──────────
+    const API = () => (typeof getShardURL === 'function' ? getShardURL() : '');
+    const RARITY = { warrior:'legendary', mage:'epic', rogue:'rare', ranger:'rare' };
+    const AV = { ragnar:'⚔️', lyria:'🔮', kira:'🗡️', warrior:'⚔️', mage:'🔮', rogue:'🗡️' };
+    const TSTYLE = ['','Cottage','Homestead','Manor','Fortress'];
+    const TEMOJI = ['','🏡','🏘️','🏰','🏯'];
+    const TINCOME = ['','Residential','Commercial','Estate','Stronghold'];
+    const TCOLOR = ['','#38e0d8','#5aa0e6','#b57ce0','#e6c25a'];
+
+    let agents = {}, properties = [], incomeHistory = [], tick = 0, view = 'dashboard', live = false;
+
+    function seed(){
+      agents = {
+        ragnar:{id:'ragnar',hp:92,maxHp:120,gold:3450,level:8,zone:'Volcano',alive:true},
+        lyria:{id:'lyria',hp:78,maxHp:100,gold:5120,level:10,zone:'Glacier',alive:true},
+        kira:{id:'kira',hp:64,maxHp:90,gold:2180,level:6,zone:'Dungeon',alive:true},
+      };
+      properties = [
+        {def:{id:'dark_castle_1',name:'Shadowgate Castle',zone:'dark_forest',tier:4},owner:'ragnar',ownerName:'Ragnar',listedFor:null,rentPerTick:120,totalEarned:4200},
+        {def:{id:'dark_manor_1',name:"Necromancer's Tower",zone:'dark_forest',tier:3},owner:'lyria',ownerName:'Lyria',listedFor:null,rentPerTick:58,totalEarned:1900},
+        {def:{id:'wild_manor_1',name:"Elias's Hunting Lodge",zone:'wild_meadow',tier:3},owner:'ragnar',ownerName:'Ragnar',listedFor:null,rentPerTick:34,totalEarned:980},
+        {def:{id:'meadow_manor_1',name:"Aldric's Manor",zone:'human_meadow',tier:3},owner:'kira',ownerName:'Kira',listedFor:null,rentPerTick:22,totalEarned:540},
+      ];
+      incomeHistory = [180,210,240,205,260,288,310];
+    }
+
+    async function refresh(){
+      try {
+        const [mkt, mesh] = await Promise.all([
+          fetch(API()+'/properties/all').then(r=>r.json()).catch(()=>null),
+          fetch(API()+'/foxmq/snapshot').then(r=>r.json()).catch(()=>null),
+        ]);
+        if (mkt && (mkt.properties||Array.isArray(mkt))) {
+          const list = mkt.properties || mkt;
+          if (Array.isArray(list) && list.length) { properties = list; live = true; }
+        }
+        if (mesh && mesh.agents && mesh.agents.length) {
+          live = true;
+          for (const a of mesh.agents) {
+            const id = (a.name||a.id||'').toLowerCase(); if(!id) continue;
+            agents[id] = { id, hp:a.hp??0, maxHp:a.maxHp??100, gold:a.gold??0, level:a.level??1, zone:a.zone||null, alive:a.alive??(a.status!=='stale') };
+          }
+          const totalPassive = properties.reduce((s,p)=>s+(p.owner?(p.rentPerTick||p.def?.rentPerTick||0):0),0);
+          if (totalPassive>0){ incomeHistory.push(totalPassive); if(incomeHistory.length>7) incomeHistory.shift(); }
+          tick++;
+        }
+      } catch(e){}
+      renderDash();
+    }
+
+    const owned = () => properties.filter(p=>p.owner);
+    const rentOf = p => p.rentPerTick || (p.def&&p.def.rentPerTick) || 0;
+    const cap = s => s? s[0].toUpperCase()+s.slice(1):s;
+    const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const aclass = id => id.includes('ragnar')?'warrior':id.includes('lyria')?'mage':id.includes('kira')?'rogue':'ranger';
+    const succ = a => Math.round(((a.maxHp?a.hp/a.maxHp:0.5)*0.5 + Math.min(1,a.gold/6000)*0.5)*100);
+    const zoneName = z => cap(String(z||'').replace(/_/g,' '));
+    const tierName = p => p>=300?'Imperial':p>=150?'Ascendant':p>=50?'Established':'Rising';
+    function trend(){ if(incomeHistory.length<2) return 0; const a=incomeHistory[incomeHistory.length-2],b=incomeHistory[incomeHistory.length-1]; return a?Math.round((b-a)/a*100):0; }
+    function setT(id,v){ const e=document.getElementById(id); if(e) e.textContent=v; }
+
+    function renderDash(){
+      const own = owned();
+      const totalPassive = own.reduce((s,p)=>s+rentOf(p),0);
+      const totalGold = Object.values(agents).reduce((s,a)=>s+a.gold,0);
+      const list = Object.values(agents);
+      setT('edb-gold', totalGold.toLocaleString());
+      setT('edb-diamonds', String(own.filter(p=>p.def.tier>=3).length));
+      setT('edb-passive', totalPassive.toLocaleString());
+      const tr = trend(); setT('edb-trend', (tr>=0?'+':'')+tr+'%');
+      setT('edb-owned', String(own.length));
+      setT('edb-available', String(properties.filter(p=>!p.owner).length));
+      setT('edb-agents-emp', String(list.length));
+      setT('edb-agents-act', String(list.filter(a=>a.alive).length));
+      setT('edb-nav-props', String(own.length));
+      setT('edb-nav-agents', String(list.length));
+      const cl=document.getElementById('edb-conn'); if(cl) cl.textContent = live?'LIVE':'DEMO DATA';
+      renderProps(own); renderSpark(); renderDonut(own); renderAgents(list);
+    }
+
+    function renderProps(own){
+      const el=document.getElementById('edb-proplist'); if(!el) return;
+      // view filter: properties view shows all owned; market shows listed
+      let items = own;
+      if (view==='market') items = properties.filter(p=>p.listedFor);
+      const top=[...items].sort((a,b)=>rentOf(b)-rentOf(a)).slice(0, view==='dashboard'?4:12);
+      el.innerHTML = top.map((p,i)=>{
+        const t=p.def.tier, ten=Math.min(30,12+t*5+(i%3)), mt=ten+(t>=4?0:1+(i%3));
+        return `<div class="edb-prop ${i===0&&view==='dashboard'?'feat':''}">
+          <div class="edb-thumb t${t}">${TEMOJI[t]||'🏠'}</div>
+          <div class="edb-pinfo"><div class="edb-phead"><span class="edb-pname">${esc(p.def.name)}</span><span class="edb-tbadge">Tier ${t}</span><span class="edb-pstyle">${TSTYLE[t]||'Estate'}</span></div>
+          <div class="edb-pmeta">Owner: <b>${esc(cap(p.ownerName||p.owner||'—'))}</b> · Zone: <b>${esc(zoneName(p.def.zone))}</b><br/>Income: <span class="gld">G ${rentOf(p)}/tick</span> · Tenants: <b>${ten}/${mt}</b>${p.listedFor?` · <span style="color:#e6c25a">Listed @ ${p.listedFor}g</span>`:''}</div>
+          <button class="edb-manage">Manage</button></div></div>`;
+      }).join('') || `<div style="color:#7a8a92;font-size:13px;padding:20px">${view==='market'?'No properties currently listed for sale.':'No properties owned yet — agents are still accumulating gold.'}</div>`;
+    }
+
+    function renderSpark(){
+      const svg=document.getElementById('edb-spark'); if(!svg) return;
+      const data=incomeHistory.length?incomeHistory:[0,0,0,0,0,0,0], w=260,h=100,pad=6;
+      const max=Math.max(...data,1),min=Math.min(...data,0),range=(max-min)||1;
+      const pts=data.map((v,i)=>[pad+i*(w-pad*2)/((data.length-1)||1), h-pad-((v-min)/range)*(h-pad*2-14)]);
+      const line=pts.map((p,i)=>`${i?'L':'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+      const area=`${line} L${pts[pts.length-1][0].toFixed(1)},${h-pad} L${pts[0][0].toFixed(1)},${h-pad} Z`;
+      const labs=['-6','-5','-4','-3','-2','-1','now'];
+      svg.innerHTML=`<defs><linearGradient id="edbspk" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38e0d8" stop-opacity="0.35"/><stop offset="100%" stop-color="#38e0d8" stop-opacity="0"/></linearGradient></defs>
+        <path d="${area}" fill="url(#edbspk)"/><path d="${line}" fill="none" stroke="#38e0d8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        ${pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2" fill="#38e0d8"/>`).join('')}
+        ${labs.map((d,i)=>`<text class="edb-axis" x="${pad+i*(w-pad*2)/6}" y="${h-1}" text-anchor="middle">${d}</text>`).join('')}`;
+    }
+
+    function renderDonut(own){
+      const byTier={}; for(const p of own) byTier[p.def.tier]=(byTier[p.def.tier]||0)+rentOf(p);
+      const total=Object.values(byTier).reduce((s,v)=>s+v,0)||1;
+      const svg=document.getElementById('edb-donut'), leg=document.getElementById('edb-donut-legend'); if(!svg) return;
+      let off=25; const seg=[],lg=[];
+      for(const t of Object.keys(byTier).map(Number).sort((a,b)=>b-a)){
+        const pct=byTier[t]/total*100;
+        seg.push(`<circle cx="21" cy="21" r="15.9" fill="none" stroke="${TCOLOR[t]}" stroke-width="5" stroke-dasharray="${pct.toFixed(1)} ${(100-pct).toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/>`);
+        off-=pct;
+        lg.push(`<div class="edb-li"><span class="edb-ld" style="background:${TCOLOR[t]}"></span><span class="edb-ln">${TINCOME[t]||'Tier '+t}</span><span class="edb-lp">${Math.round(pct)}%</span></div>`);
+      }
+      svg.innerHTML=`<circle cx="21" cy="21" r="15.9" fill="none" stroke="rgba(120,200,210,0.06)" stroke-width="5"/>`+seg.join('');
+      leg.innerHTML=lg.join('')||`<div class="edb-li"><span class="edb-ln">No income yet</span></div>`;
+    }
+
+    function renderAgents(list){
+      const el=document.getElementById('edb-agrid'); if(!el) return;
+      const ranked=[...list].sort((a,b)=>b.gold-a.gold);
+      el.innerHTML=ranked.slice(0,3).map((a,i)=>{
+        const cls=aclass(a.id), rar=RARITY[cls]||'rare', pct=succ(a);
+        const crown=i===0?'👑':i===1?'⭐':'◆', pc=properties.filter(p=>p.owner===a.id).length;
+        const pcolor = rar==='legendary'?'#e6c25a':rar==='epic'?'#b57ce0':'#5aa0e6';
+        return `<div class="edb-ac ${rar}"><div class="edb-atop"><div class="edb-aav ${rar}">${AV[a.id]||AV[cls]||'🧝'}</div><div><div class="edb-anm">${esc(cap(a.id))}</div><div class="edb-ar ${rar}">${cap(rar)}</div></div><div class="edb-acrown">${crown}</div></div>
+          <div class="edb-arows"><div class="edb-arow"><span class="k">Class</span><span class="v">${cap(cls)}</span><span class="v rk">Rank ${i+1}</span></div><div class="edb-arow"><span class="k">Gold</span><span class="v">${a.gold.toLocaleString()}g</span></div><div class="edb-arow"><span class="k">Level</span><span class="v">${a.level}</span></div><div class="edb-arow"><span class="k">Estates</span><span class="v">${pc}</span></div><div class="edb-arow"><span class="k">Zone</span><span class="v">${esc(a.zone||'—')}</span></div></div>
+          <div class="edb-asucc"><div class="edb-asl"><span style="color:#7a8a92">Success</span><span class="p" style="color:${pcolor}">${pct}%</span></div><div class="edb-bar"><div class="f ${rar}" style="width:${pct}%"></div></div></div>
+          <button class="edb-view">View Portfolio</button></div>`;
+      }).join('');
+    }
+
+    // ── Sidebar nav: switch views (dashboard / properties / agents / income / market …) ──
+    function applyView(v){
+      view = v;
+      document.querySelectorAll('#edb-nav .edb-nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===v));
+      const side=document.getElementById('edb-side'), title=document.getElementById('edb-list-title'), agr=document.querySelector('#estate-dashboard-overlay .agents-section');
+      // Show/hide sections per view
+      const showSide = (v==='dashboard'||v==='income');
+      const showAgents = (v==='dashboard'||v==='agents');
+      const showList = (v!=='agents'&&v!=='settings'&&v!=='upgrades');
+      if(side) side.style.display = showSide?'flex':'none';
+      if(agr) agr.style.display = showAgents?'block':'none';
+      const listWrap = document.getElementById('edb-proplist').parentElement;
+      if(listWrap) listWrap.style.display = showList?'block':'none';
+      if(title) title.textContent = v==='market'?'Market Listings':v==='properties'?'All Owned Properties':v==='income'?'Income Overview':'Current Properties';
+      // simple placeholders for not-yet-built sections
+      if(v==='upgrades'||v==='settings'){
+        if(title){ title.textContent = cap(v); }
+      }
+      renderDash();
+    }
+    document.querySelectorAll('#edb-nav .edb-nav-item').forEach(item=>{
+      item.addEventListener('click', ()=> applyView(item.dataset.view));
+    });
+
+    let _timer=null;
+    window.openEstateDashboard = function(){
+      document.getElementById('estate-dashboard-overlay').classList.add('open');
+      applyView('dashboard'); refresh();
+      if(!_timer) _timer=setInterval(refresh, 4000);
+    };
+    window.closeEstateDashboard = function(){
+      document.getElementById('estate-dashboard-overlay').classList.remove('open');
+      if(_timer){ clearInterval(_timer); _timer=null; }
+    };
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape') window.closeEstateDashboard(); });
+
+    seed(); renderDash();
+  })();
+  </script>
 </body>
 </html>

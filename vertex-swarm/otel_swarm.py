@@ -9,7 +9,7 @@ Keeps all telemetry concerns out of wog_swarm.py. Provides:
   - agent metric instruments   HP / gold / consensus wins / conflicts
 
 Config (env, see .env.example):
-  OTEL_EXPORTER_OTLP_ENDPOINT   https://ingest.us.signoz.cloud:443
+  OTEL_EXPORTER_OTLP_ENDPOINT   https://ingest.us2.signoz.cloud:443
   SIGNOZ_INGESTION_KEY          SigNoz Cloud ingestion key
   OTEL_SERVICE_NAME             defaults to "wog-agent-swarm"
 
@@ -42,7 +42,7 @@ except Exception:  # pragma: no cover — offline / libs missing
     _OTEL_AVAILABLE = False
 
 
-_ENDPOINT = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "https://ingest.us.signoz.cloud:443")
+_ENDPOINT = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "https://ingest.us2.signoz.cloud:443")
 _KEY = os.environ.get("SIGNOZ_INGESTION_KEY", "")
 _HEADERS = {"signoz-ingestion-key": _KEY} if _KEY else {}
 
@@ -138,7 +138,7 @@ def init_otel(agent_name: str):
     logs.set_logger_provider(lp)
 
     _enabled = True
-    print(f"[otel] enabled → {_ENDPOINT} (service={service}, agent={agent_name})")
+    print(f"[otel] enabled -> {_ENDPOINT} (service={service}, agent={agent_name})")
     return _tracer, True
 
 
@@ -173,3 +173,43 @@ def get_logging_handler():
     if _enabled and _OTEL_AVAILABLE:
         return LoggingHandler(logger_provider=logs.get_logger_provider())
     return None
+
+
+# ── Structured logging → SigNoz Logs ─────────────────────────────────────────
+# Route through Python's stdlib logging with the OTel LoggingHandler attached.
+# Log records carry `extra` attributes (searchable in SigNoz) and are
+# auto-correlated to the active trace/span by the handler. No-op if disabled.
+import logging as _logging
+
+_std_logger = None
+
+
+def _ensure_logger():
+    global _std_logger
+    if _std_logger is not None:
+        return _std_logger
+    lg = _logging.getLogger("wog.swarm")
+    lg.setLevel(_logging.INFO)
+    lg.propagate = False
+    handler = get_logging_handler()
+    if handler is not None:
+        lg.addHandler(handler)
+    _std_logger = lg
+    return lg
+
+
+def emit_log(body: str, attributes: dict = None, severity: str = "info"):
+    """
+    Emit a structured log record to SigNoz. No-op if OTel is disabled.
+    `severity` is "info" | "warn" | "error". Attributes land as searchable
+    fields via the stdlib `extra=` mechanism.
+    """
+    if not (_enabled and _OTEL_AVAILABLE):
+        return
+    try:
+        lg = _ensure_logger()
+        level = {"info": _logging.INFO, "warn": _logging.WARNING,
+                 "error": _logging.ERROR}.get(severity, _logging.INFO)
+        lg.log(level, body, extra={"wog": attributes or {}})
+    except Exception:
+        pass  # Never let logging break the swarm.

@@ -28,6 +28,8 @@ import {
   contextFromMqtt,
   mqttPropsFromContext,
   meshMessagesReceived,
+  propertyTransferCounter,
+  emitLog,
 } from "./telemetry";
 
 // ─────────────────────────────────────────────────────────────
@@ -150,11 +152,13 @@ function handleZoneClaim(sender: string, data: Record<string, unknown>, seq: num
     // First claim in consensus order wins — grant it
     zoneClaims.set(zone, sender);
     console.log(`[FoxMQ] ZONE GRANT  seq=${seq}: ${sender} → [${zone}]`);
+    emitLog("CONSENSUS ZONE GRANT", { event: "consensus.zone.grant", winner: sender, zone, seq });
     broadcaster.emit({ type: "zone_claimed", data: { zone, claimant: sender, seq } });
   } else {
     const current = zoneClaims.get(zone);
     if (current !== sender) {
       console.log(`[FoxMQ] ZONE REJECT seq=${seq}: ${sender} conflicts with ${current} on [${zone}] — ${current} holds`);
+      emitLog("CONSENSUS ZONE REJECT", { event: "consensus.zone.reject", loser: sender, winner: current ?? "?", zone, seq }, "warn");
     }
   }
 }
@@ -281,6 +285,11 @@ function handlePropertyOffer(sender: string, data: Record<string, unknown>, seq:
   // Record as the winning offer
   pendingOffers.set(propertyId, { buyerId: sender, buyerName, gold: offer, seq });
   console.log(`[FoxMQ] OFFER ACCEPT seq=${seq}: ${sender} → [${propertyId}] @ ${offer}g — applying transfer`);
+  emitLog("CONSENSUS PROPERTY SOLD", {
+    event: "consensus.property.sold", buyer: sender, property: propertyId,
+    price: offer, seq,
+  });
+  propertyTransferCounter.add(1, { property: propertyId });
 
   // Apply the transfer in shard state
   const prevOwner = prop.owner;

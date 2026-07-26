@@ -8,7 +8,7 @@
  *
  * Sends traces + metrics + logs to SigNoz over OTLP/HTTP.
  * Config comes from env (see .env.example):
- *   OTEL_EXPORTER_OTLP_ENDPOINT   e.g. https://ingest.us.signoz.cloud:443
+ *   OTEL_EXPORTER_OTLP_ENDPOINT   e.g. https://ingest.us2.signoz.cloud:443
  *   SIGNOZ_INGESTION_KEY          SigNoz Cloud ingestion key
  *   OTEL_SERVICE_NAME             defaults to "wog-shard"
  */
@@ -33,7 +33,7 @@ if (process.env.OTEL_DEBUG === "1") {
 }
 
 const endpoint =
-  process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "https://ingest.us.signoz.cloud:443";
+  process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "https://ingest.us2.signoz.cloud:443";
 const ingestionKey = process.env.SIGNOZ_INGESTION_KEY || "";
 const serviceName = process.env.OTEL_SERVICE_NAME || "wog-shard";
 

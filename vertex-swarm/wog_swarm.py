@@ -383,6 +383,10 @@ class WoGAgent:
         otel.m_consensus_wins.add(
             len(freed_zones) + len(freed_quests),
             {"kind": "selfheal_reclaim", "healer": self.name})
+        otel.emit_log("SELF-HEAL redistribute", {
+            "event": "selfheal.redistribute", "healer": self.name,
+            "dead_agent": dead, "reason": reason,
+            "freed_zones": len(freed_zones), "freed_quests": len(freed_quests)}, "warn")
 
     def _handle_zone_claim(self, sender, data):
         zone = data.get("zone", "")
@@ -391,10 +395,17 @@ class WoGAgent:
             self.zone_claims[zone] = sender
             print(f"  [{self.name}] CONSENSUS ZONE GRANT  seq={seq}: {sender} → [{zone}]")
             otel.m_consensus_wins.add(1, {"kind": "zone", "winner": sender})
+            otel.emit_log("CONSENSUS ZONE GRANT", {
+                "event": "consensus.zone.grant", "observer": self.name,
+                "winner": sender, "zone": zone, "seq": seq}, "info")
         elif self.zone_claims[zone] != sender:
             print(f"  [{self.name}] CONSENSUS ZONE REJECT seq={seq}: {sender} conflicts with {self.zone_claims[zone]} on [{zone}] — {self.zone_claims[zone]} WINS")
             otel.m_consensus_conflicts.add(
                 1, {"kind": "zone", "loser": sender, "winner": self.zone_claims[zone]})
+            otel.emit_log("CONSENSUS ZONE REJECT", {
+                "event": "consensus.zone.reject", "observer": self.name,
+                "loser": sender, "winner": self.zone_claims[zone],
+                "zone": zone, "seq": seq}, "warn")
 
     def _handle_zone_yield(self, sender, data):
         zone = data.get("zone", "")
