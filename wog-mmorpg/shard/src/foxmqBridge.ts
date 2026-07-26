@@ -20,8 +20,15 @@
  */
 
 import * as mqtt from "mqtt";
+import { context as otelContext, SpanKind } from "@opentelemetry/api";
 import { broadcaster } from "./wsEvents";
 import { applyFoxmqTransfer, applyFoxmqList, getProperty } from "./propertyMarket";
+import {
+  tracer,
+  contextFromMqtt,
+  mqttPropsFromContext,
+  meshMessagesReceived,
+} from "./telemetry";
 
 // ─────────────────────────────────────────────────────────────
 // CONFIG
@@ -102,8 +109,33 @@ export function mqPublish(topic: string, payload: Record<string, unknown>): bool
   if (!_client?.connected) return false;
   payload._seq = ++_pubSeq;
   payload._src = "shard";
-  _client.publish(topic, JSON.stringify(payload), { qos: 1 });
-  return true;
+
+  return tracer.startActiveSpan(
+    `FoxMQ publish ${topic}`,
+    {
+      kind: SpanKind.PRODUCER,
+      attributes: {
+        "messaging.system": "foxmq",
+        "messaging.destination.name": topic,
+        "messaging.operation": "publish",
+        "wog.seq": _pubSeq,
+      },
+    },
+    (span) => {
+      try {
+        // Propagate the active trace to subscribers via MQTT5 user properties.
+        const carrier = mqttPropsFromContext();
+        const userProperties: Record<string, string> = { ...carrier };
+        _client!.publish(topic, JSON.stringify(payload), {
+          qos: 1,
+          properties: { userProperties },
+        });
+        return true;
+      } finally {
+        span.end();
+      }
+    },
+  );
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -380,6 +412,9 @@ export function startFoxmqBridge() {
     connectTimeout:  3000,
     clientId:        "wog-shard-bridge",
     clean:           true,
+    // MQTT 5.0 so we can read W3C traceparent from user properties → the
+    // distributed trace continues from the Python agent through the shard.
+    protocolVersion: 5,
   });
 
   _client = client;
@@ -406,22 +441,53 @@ export function startFoxmqBridge() {
     _client = client;
   });
 
-  client.on("message", (topic, payload) => {
+  client.on("message", (topic, payload, packet) => {
     let data: Record<string, unknown> = {};
     try { data = JSON.parse(payload.toString()); } catch { return; }
 
     const sender = (data.agent as string) || (data.id as string) || (data.buyer as string) || "unknown";
     const seq    = Number(data.seq ?? data._seq ?? 0);
 
-    // ── Consensus write handlers ───────────────────────────
-    if (topic === "wog/zone/claim")        handleZoneClaim(sender, data, seq);
-    else if (topic === "wog/zone/yield")   handleZoneYield(sender, data);
-    else if (topic === "wog/quest/claim")  handleQuestClaim(sender, data, seq);
-    else if (topic === "wog/quest/abandon")handleQuestAbandon(sender, data);
-    else if (topic === "wog/property/offer")  handlePropertyOffer(sender, data, seq);
-    else if (topic === "wog/property/sold")   handlePropertySold(sender, data);
-    else if (topic === "wog/property/list")   handlePropertyList(sender, data);
-    else if (topic === "wog/property/distress") handlePropertyDistress(sender, data);
+    // Continue the distributed trace: pull W3C context out of the MQTT5
+    // user properties the publisher attached, then run the consensus handler
+    // inside a CONSUMER span parented to the agent that produced the message.
+    const userProps = (packet as any)?.properties?.userProperties as
+      | Record<string, string | string[]>
+      | undefined;
+    const parentCtx = contextFromMqtt(userProps);
+
+    meshMessagesReceived.add(1, { topic, sender });
+
+    otelContext.with(parentCtx, () => {
+      tracer.startActiveSpan(
+        `FoxMQ receive ${topic}`,
+        {
+          kind: SpanKind.CONSUMER,
+          attributes: {
+            "messaging.system": "foxmq",
+            "messaging.destination.name": topic,
+            "messaging.operation": "receive",
+            "wog.sender": sender,
+            "wog.seq": seq,
+          },
+        },
+        (span) => {
+          try {
+            // ── Consensus write handlers ───────────────────────────
+            if (topic === "wog/zone/claim")        handleZoneClaim(sender, data, seq);
+            else if (topic === "wog/zone/yield")   handleZoneYield(sender, data);
+            else if (topic === "wog/quest/claim")  handleQuestClaim(sender, data, seq);
+            else if (topic === "wog/quest/abandon")handleQuestAbandon(sender, data);
+            else if (topic === "wog/property/offer")  handlePropertyOffer(sender, data, seq);
+            else if (topic === "wog/property/sold")   handlePropertySold(sender, data);
+            else if (topic === "wog/property/list")   handlePropertyList(sender, data);
+            else if (topic === "wog/property/distress") handlePropertyDistress(sender, data);
+          } finally {
+            span.end();
+          }
+        },
+      );
+    });
 
     // ── Mesh display state ─────────────────────────────────
     if (topic === "wog/heartbeat") {

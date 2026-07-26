@@ -3,6 +3,10 @@
  * Fastify HTTP + WebSocket server
  */
 
+// OpenTelemetry MUST be initialized before any instrumented library is imported
+// (Fastify, http, mqtt). Keep this as the very first import. → SigNoz.
+import "./otel";
+
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";

@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>World of Guilds — Estate Panels</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap');
+
+    :root {
+      --bg-0: #060a12;
+      --bg-1: #0a1018;
+      --panel: rgba(16, 24, 34, 0.72);
+      --panel-solid: #0e1620;
+      --stroke: rgba(120, 200, 210, 0.10);
+      --stroke-strong: rgba(120, 220, 230, 0.28);
+      --teal: #38e0d8;
+      --teal-dim: #1fb8b0;
+      --cyan-glow: rgba(56, 224, 216, 0.35);
+      --gold: #e6c25a;
+      --diamond: #7fd4ff;
+      --text: #e8f0f2;
+      --text-dim: #7a8a92;
+      --text-faint: #4a5860;
+      --epic: #b57ce0;
+      --legendary: #e6c25a;
+      --rare: #5aa0e6;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(ellipse 120% 80% at 50% -10%, rgba(30, 60, 70, 0.5) 0%, transparent 55%),
+        radial-gradient(ellipse 80% 60% at 100% 100%, rgba(20, 44, 52, 0.4) 0%, transparent 50%),
+        var(--bg-0);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1, h2, h3, .brand, .stat-tile-value, .prop-name, .agent-name, .nav-label {
+      font-family: 'Outfit', sans-serif;
+    }
+    .tnum { font-variant-numeric: tabular-nums; }
+
+    /* ── Shell ─────────────────────────────────────────── */
+    .app {
+      display: grid;
+      grid-template-columns: 232px 1fr;
+      gap: 22px;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 26px 26px 40px;
+      min-height: 100vh;
+    }
+
+    /* ── Sidebar ───────────────────────────────────────── */
+    .sidebar {
+      background: linear-gradient(180deg, rgba(14, 22, 32, 0.9) 0%, rgba(10, 16, 24, 0.85) 100%);
+      border: 1px solid var(--stroke);
+      border-radius: 20px;
+      padding: 26px 16px;
+      display: flex;
+      flex-direction: column;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      position: sticky;
+      top: 26px;
+      height: fit-content;
+    }
+    .brand {
+      font-size: 19px; font-weight: 800; letter-spacing: 1px;
+      padding: 0 10px 26px; display: flex; align-items: center; gap: 8px;
+    }
+    .brand .estate { color: var(--teal); }
+    .brand .panels { color: var(--text); }
+    .brand .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 10px var(--cyan-glow); }
+
+    .nav-item {
+      display: flex; align-items: center; gap: 13px;
+      padding: 12px 14px; border-radius: 12px; cursor: pointer;
+      color: var(--text-dim); font-size: 14px; font-weight: 600;
+      transition: all 0.18s ease; margin-bottom: 3px; position: relative;
+      border: 1px solid transparent;
+    }
+    .nav-item .nav-icon { width: 20px; height: 20px; flex-shrink: 0; display: flex; }
+    .nav-item .nav-icon svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+    .nav-item:hover { color: var(--text); background: rgba(56, 224, 216, 0.05); }
+    .nav-item.active {
+      color: var(--teal);
+      background: linear-gradient(100deg, rgba(56, 224, 216, 0.16) 0%, rgba(56, 224, 216, 0.04) 100%);
+      border-color: rgba(56, 224, 216, 0.22);
+      box-shadow: inset 0 0 20px rgba(56, 224, 216, 0.06);
+    }
+    .nav-item.active::before {
+      content: ''; position: absolute; left: -16px; top: 50%; transform: translateY(-50%);
+      width: 3px; height: 22px; border-radius: 2px; background: var(--teal); box-shadow: 0 0 10px var(--cyan-glow);
+    }
+    .nav-badge {
+      margin-left: auto; font-size: 11px; font-weight: 700; color: var(--text-dim);
+      background: rgba(120, 200, 210, 0.08); border-radius: 20px; padding: 2px 9px;
+    }
+    .nav-item.active .nav-badge { color: var(--teal); background: rgba(56, 224, 216, 0.12); }
+
+    /* ── Main column ───────────────────────────────────── */
+    .main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+
+    /* Header row */
+    .topbar {
+      display: flex; align-items: center; gap: 18px;
+      background: var(--panel); border: 1px solid var(--stroke);
+      border-radius: 16px; padding: 14px 20px; backdrop-filter: blur(16px);
+    }
+    .lord { display: flex; align-items: center; gap: 11px; }
+    .lord-avatar {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: linear-gradient(135deg, #2a5a62, #1a3a42); border: 1px solid var(--stroke-strong);
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+    }
+    .lord-name { font-size: 14px; font-weight: 700; }
+    .topbar-spacer { flex: 1; }
+    .currency { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; }
+    .currency .coin { width: 17px; height: 17px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+    .coin.gold { background: radial-gradient(circle at 35% 30%, #f5d67a, #b8901f); color: #5a3d00; }
+    .coin.diamond { background: radial-gradient(circle at 35% 30%, #b8ecff, #4aa8d8); color: #06304a; }
+    .currency .label { color: var(--text-dim); font-weight: 500; }
+    .status-block { text-align: right; font-size: 11px; color: var(--text-dim); line-height: 1.5; }
+    .status-block .tier { color: var(--teal); font-weight: 700; }
+    .bell {
+      position: relative; width: 34px; height: 34px; border-radius: 10px;
+      background: rgba(120, 200, 210, 0.06); border: 1px solid var(--stroke);
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+    }
+    .bell svg { width: 17px; height: 17px; stroke: var(--text-dim); fill: none; stroke-width: 1.8; }
+    .bell .badge {
+      position: absolute; top: -4px; right: -4px; min-width: 15px; height: 15px; padding: 0 4px;
+      border-radius: 8px; background: #e6555a; color: #fff; font-size: 9px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* Stat tiles */
+    .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .stat-tile {
+      background: var(--panel); border: 1px solid var(--stroke); border-radius: 16px;
+      padding: 16px 18px; backdrop-filter: blur(16px); position: relative; overflow: hidden;
+    }
+    .stat-tile::after {
+      content: ''; position: absolute; inset: 0; border-radius: 16px; pointer-events: none;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+    .stat-label { font-size: 10.5px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-dim); font-weight: 600; }
+    .stat-tile-value { font-size: 27px; font-weight: 800; margin-top: 8px; display: flex; align-items: baseline; gap: 6px; }
+    .stat-tile-value .unit { font-size: 12px; color: var(--text-dim); font-weight: 600; }
+    .stat-tile-value .gicon { color: var(--gold); font-size: 20px; }
+    .stat-sub { font-size: 11px; color: var(--text-dim); margin-top: 5px; display: flex; align-items: center; gap: 6px; }
+    .trend-up { color: var(--teal); font-weight: 700; }
+    .stat-split { display: flex; gap: 26px; margin-top: 8px; }
+    .stat-split .num { font-size: 27px; font-weight: 800; font-family: 'Outfit'; }
+    .stat-split .cap { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+    .stat-split .num.dim { color: var(--text-dim); }
+    .stat-ico { position: absolute; top: 16px; right: 18px; color: var(--text-faint); }
+    .stat-ico svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+
+    /* Content grid: properties (left) + charts (right) */
+    .content-grid { display: grid; grid-template-columns: 1fr 300px; gap: 18px; align-items: start; }
+    .section-title { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-dim); font-weight: 700; margin-bottom: 12px; }
+
+    /* Property cards */
+    .prop-list { display: flex; flex-direction: column; gap: 12px; }
+    .prop-card {
+      display: flex; gap: 14px; align-items: center;
+      background: var(--panel); border: 1px solid var(--stroke); border-radius: 14px;
+      padding: 12px; backdrop-filter: blur(14px); transition: all 0.2s ease;
+    }
+    .prop-card:hover { border-color: var(--stroke-strong); transform: translateX(2px); box-shadow: -4px 0 20px rgba(56,224,216,0.06); }
+    .prop-card.featured { border-color: rgba(56, 224, 216, 0.3); box-shadow: 0 0 24px rgba(56, 224, 216, 0.07); }
+    .prop-thumb {
+      width: 88px; height: 68px; border-radius: 10px; flex-shrink: 0; position: relative; overflow: hidden;
+      display: flex; align-items: center; justify-content: center; font-size: 30px;
+      border: 1px solid var(--stroke);
+    }
+    .prop-thumb.t1 { background: linear-gradient(150deg, #2a3a2e, #1a2a1e); }
+    .prop-thumb.t2 { background: linear-gradient(150deg, #3a3020, #241c12); }
+    .prop-thumb.t3 { background: linear-gradient(150deg, #2a2440, #181228); }
+    .prop-thumb.t4 { background: linear-gradient(150deg, #402028, #281016); }
+    .prop-info { flex: 1; min-width: 0; }
+    .prop-head { display: flex; align-items: center; gap: 8px; }
+    .prop-name { font-size: 15px; font-weight: 700; }
+    .prop-style {
+      margin-left: auto; font-size: 10px; font-weight: 600; color: var(--teal);
+      background: rgba(56, 224, 216, 0.1); border: 1px solid rgba(56,224,216,0.18);
+      border-radius: 8px; padding: 2px 8px; display: flex; align-items: center; gap: 5px;
+    }
+    .prop-meta { font-size: 11.5px; color: var(--text-dim); margin-top: 5px; line-height: 1.6; }
+    .prop-meta b { color: var(--text); font-weight: 600; }
+    .prop-meta .gld { color: var(--gold); font-weight: 600; }
+    .prop-tier-badge {
+      font-size: 9px; font-weight: 700; padding: 1px 7px; border-radius: 6px;
+      background: rgba(120,200,210,0.1); color: var(--text-dim);
+    }
+    .manage-btn {
+      align-self: flex-start; margin-top: 8px; font-size: 11px; font-weight: 600; color: var(--teal);
+      background: rgba(56, 224, 216, 0.08); border: 1px solid rgba(56,224,216,0.25);
+      border-radius: 9px; padding: 6px 16px; cursor: pointer; font-family: 'Inter'; transition: all 0.16s;
+    }
+    .manage-btn:hover { background: rgba(56, 224, 216, 0.16); box-shadow: 0 0 14px rgba(56,224,216,0.15); }
+    .prop-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+
+    /* Chart cards */
+    .side-col { display: flex; flex-direction: column; gap: 16px; }
+    .chart-card {
+      background: var(--panel); border: 1px solid var(--stroke); border-radius: 16px;
+      padding: 16px; backdrop-filter: blur(16px);
+    }
+    .chart-card h3 { font-size: 13px; font-weight: 700; }
+    .chart-card .csub { font-size: 10.5px; color: var(--text-dim); margin-top: 2px; margin-bottom: 12px; }
+    .spark-wrap { position: relative; }
+    .spark-wrap svg { width: 100%; height: 90px; display: block; overflow: visible; }
+    .axis-label { font-size: 8.5px; fill: var(--text-faint); }
+
+    /* Donut */
+    .donut-wrap { display: flex; align-items: center; gap: 16px; }
+    .donut { width: 108px; height: 108px; flex-shrink: 0; }
+    .legend { display: flex; flex-direction: column; gap: 9px; flex: 1; }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
+    .legend-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+    .legend-name { color: var(--text-dim); }
+    .legend-pct { margin-left: auto; font-weight: 700; }
+
+    /* Agent portfolio cards */
+    .agents-section { margin-top: 4px; }
+    .agent-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .agent-card {
+      background: var(--panel); border: 1px solid var(--stroke); border-radius: 16px;
+      padding: 16px; backdrop-filter: blur(16px); position: relative; overflow: hidden;
+    }
+    .agent-card.epic { border-color: rgba(181, 124, 224, 0.3); }
+    .agent-card.legendary { border-color: rgba(230, 194, 90, 0.35); box-shadow: 0 0 26px rgba(230,194,90,0.08); }
+    .agent-card.rare { border-color: rgba(90, 160, 230, 0.28); }
+    .agent-top { display: flex; align-items: center; gap: 11px; }
+    .agent-avatar {
+      width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 22px;
+      border: 1px solid var(--stroke-strong);
+    }
+    .agent-avatar.epic { background: linear-gradient(140deg, #3a2450, #241432); }
+    .agent-avatar.legendary { background: linear-gradient(140deg, #4a3a18, #2e2410); }
+    .agent-avatar.rare { background: linear-gradient(140deg, #1e3450, #122032); }
+    .agent-name { font-size: 15px; font-weight: 700; }
+    .agent-rarity { font-size: 11px; font-weight: 600; margin-top: 1px; }
+    .agent-rarity.epic { color: var(--epic); }
+    .agent-rarity.legendary { color: var(--legendary); }
+    .agent-rarity.rare { color: var(--rare); }
+    .agent-crown { margin-left: auto; font-size: 14px; opacity: 0.85; }
+    .agent-rows { margin-top: 13px; display: flex; flex-direction: column; gap: 7px; font-size: 11.5px; }
+    .agent-row { display: flex; align-items: baseline; gap: 6px; }
+    .agent-row .k { color: var(--text-dim); min-width: 52px; }
+    .agent-row .v { color: var(--text); font-weight: 600; }
+    .agent-row .v.rank { margin-left: auto; }
+    .agent-success { margin-top: 13px; }
+    .agent-success .slabel { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 5px; }
+    .agent-success .slabel .spct { font-weight: 700; }
+    .bar { height: 6px; border-radius: 4px; background: rgba(120,200,210,0.08); overflow: hidden; }
+    .bar .fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+    .bar .fill.epic { background: linear-gradient(90deg, #8a5ac0, var(--epic)); }
+    .bar .fill.legendary { background: linear-gradient(90deg, #c0a030, var(--legendary)); }
+    .bar .fill.rare { background: linear-gradient(90deg, #3a70c0, var(--rare)); }
+    .view-btn {
+      margin-top: 13px; width: 100%; font-size: 12px; font-weight: 600; color: var(--teal);
+      background: rgba(56,224,216,0.08); border: 1px solid rgba(56,224,216,0.22);
+      border-radius: 10px; padding: 8px; cursor: pointer; font-family: 'Inter'; transition: all 0.16s;
+    }
+    .view-btn:hover { background: rgba(56,224,216,0.15); }
+
+    .live-pill {
+      display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700;
+      color: var(--teal); letter-spacing: 0.5px;
+    }
+    .live-pill .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 8px var(--cyan-glow); animation: pulse 1.6s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+    @media (max-width: 980px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { position: static; flex-direction: row; overflow-x: auto; }
+      .content-grid { grid-template-columns: 1fr; }
+      .agent-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- ── Sidebar ─────────────────────────────────── -->
+    <aside class="sidebar">
+      <div class="brand"><span class="dot"></span><span class="estate">ESTATE</span>&nbsp;<span class="panels">PANELS</span></div>
+      <nav id="nav">
+        <div class="nav-item active" data-view="dashboard">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span>
+          <span class="nav-label">Dashboard</span>
+        </div>
+        <div class="nav-item" data-view="properties">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></span>
+          <span class="nav-label">Properties</span>
+          <span class="nav-badge" id="nav-prop-count">0</span>
+        </div>
+        <div class="nav-item" data-view="agents">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/></svg></span>
+          <span class="nav-label">Agents</span>
+          <span class="nav-badge" id="nav-agent-count">0</span>
+        </div>
+        <div class="nav-item" data-view="income">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-9"/><path d="M16 3h5v5"/></svg></span>
+          <span class="nav-label">Income</span>
+        </div>
+        <div class="nav-item" data-view="market">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M6 6h15l-1.5 9h-12z"/><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M6 6 5 3H2"/></svg></span>
+          <span class="nav-label">Market</span>
+        </div>
+        <div class="nav-item" data-view="upgrades">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="m7 8 5-5 5 5"/></svg></span>
+          <span class="nav-label">Upgrades</span>
+        </div>
+        <div class="nav-item" data-view="settings">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.5-2.4 1a7 7 0 0 0-1.7-1l-.3-2.5h-4l-.3 2.5a7 7 0 0 0-1.7 1l-2.4-1-2 3.5 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.5 2.4-1a7 7 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7 7 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5a7 7 0 0 0 .1-1z"/></svg></span>
+          <span class="nav-label">Settings</span>
+        </div>
+      </nav>
+      <div style="margin-top:auto;padding:16px 10px 0">
+        <div class="live-pill"><span class="pulse"></span><span id="conn-label">CONNECTING</span></div>
+      </div>
+    </aside>
+
+    <!-- ── Main ────────────────────────────────────── -->
+    <div class="main">
+      <!-- Topbar -->
+      <div class="topbar">
+        <div class="lord">
+          <div class="lord-avatar">🦊</div>
+          <div>
+            <div class="lord-name">The Realm Ledger</div>
+            <div style="font-size:10px;color:var(--text-dim)">World of Guilds · Autonomous Economy</div>
+          </div>
+        </div>
+        <div class="topbar-spacer"></div>
+        <div class="currency"><span class="coin gold">G</span><span class="tnum" id="hdr-gold">0</span><span class="label">Gold</span></div>
+        <div class="currency"><span class="coin diamond">◆</span><span class="tnum" id="hdr-diamonds">0</span><span class="label">Diamonds</span></div>
+        <div class="status-block">
+          <div>Status: <span class="tier" id="hdr-tier">Rising</span></div>
+          <div id="hdr-tick">tick 0</div>
+        </div>
+        <div class="bell">
+          <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+          <span class="badge" id="bell-badge">0</span>
+        </div>
+      </div>
+
+      <!-- Stat tiles -->
+      <div class="stat-row">
+        <div class="stat-tile">
+          <div class="stat-label">Total Passive Income</div>
+          <div class="stat-ico"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-9"/></svg></div>
+          <div class="stat-tile-value"><span class="gicon">G</span><span class="tnum" id="tile-passive">0</span><span class="unit">/tick</span></div>
+          <div class="stat-sub">Gold trend <span class="trend-up" id="tile-passive-trend">+0%</span></div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">Total Properties</div>
+          <div class="stat-ico"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5V20H3z"/></svg></div>
+          <div class="stat-split">
+            <div><div class="num tnum" id="tile-owned">0</div><div class="cap">Owned</div></div>
+            <div><div class="num dim tnum" id="tile-available">0</div><div class="cap">Available</div></div>
+          </div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">Total Agents</div>
+          <div class="stat-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/></svg></div>
+          <div class="stat-split">
+            <div><div class="num tnum" id="tile-agents">0</div><div class="cap">Employed</div></div>
+            <div><div class="num dim tnum" id="tile-agents-active">0</div><div class="cap">Active</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Content grid -->
+      <div class="content-grid">
+        <div>
+          <div class="section-title">Current Properties</div>
+          <div class="prop-list" id="prop-list"></div>
+        </div>
+        <div class="side-col">
+          <div class="chart-card">
+            <h3>Passive Income</h3>
+            <div class="csub">Gold earned, last 7 ticks</div>
+            <div class="spark-wrap"><svg id="spark" viewBox="0 0 260 100" preserveAspectRatio="none"></svg></div>
+          </div>
+          <div class="chart-card">
+            <h3>Income Sources</h3>
+            <div class="csub" style="margin-bottom:14px">By property tier</div>
+            <div class="donut-wrap">
+              <svg class="donut" id="donut" viewBox="0 0 42 42"></svg>
+              <div class="legend" id="donut-legend"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent portfolios -->
+      <div class="agents-section">
+        <div class="section-title">Agent Portfolios</div>
+        <div class="agent-grid" id="agent-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/estate.ts"></script>
+</body>
+</html>

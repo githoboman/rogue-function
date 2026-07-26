@@ -1,0 +1,54 @@
+# render.yaml — Render Blueprint for the WoG shard server.
+# Replaces the previous Railway deployment. Deploy via:
+#   Render Dashboard → New → Blueprint → point at this repo.
+# Render auto-detects this file. Set the secret env vars (marked sync:false)
+# in the dashboard after the first deploy.
+
+services:
+  - type: web
+    name: wog-shard
+    runtime: node
+    plan: free                      # free tier sleeps on inactivity; fine for demo
+    rootDir: wog-mmorpg/shard
+    buildCommand: npm install
+    startCommand: npm start         # runs tsx src/server.ts
+    healthCheckPath: /health
+    autoDeploy: true
+    # Persistent disk for game-state.json (survives restarts/redeploys).
+    disk:
+      name: wog-state
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: SAVE_FILE
+        value: /data/game-state.json   # persisted on the mounted disk
+      - key: STACKS_NETWORK
+        value: testnet
+      # ── Observability → SigNoz (set values in dashboard) ──────
+      - key: OTEL_EXPORTER_OTLP_ENDPOINT
+        sync: false
+      - key: SIGNOZ_INGESTION_KEY
+        sync: false
+      - key: OTEL_SERVICE_NAME
+        value: wog-shard
+      # ── Secrets — set these in the Render dashboard, never commit ──
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: AGENT_SEED_PHRASE
+        sync: false
+      - key: SERVER_PRIVATE_KEY
+        sync: false
+      - key: SERVER_STACKS_ADDRESS
+        sync: false
+      - key: GOLD_CONTRACT_ADDRESS
+        sync: false
+      - key: CHARACTER_CONTRACT_ADDRESS
+        sync: false
+      - key: ITEMS_CONTRACT_ADDRESS
+        sync: false
+      # FoxMQ broker the shard bridges to (optional; leave unset to disable
+      # the FoxMQ mesh bridge when running the shard standalone).
+      - key: FOXMQ_URL
+        sync: false

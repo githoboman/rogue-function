@@ -53,6 +53,12 @@ const ITEMS_CONTRACT_NAME = "items";
 // ============================================================
 
 import { enqueueContractCall } from "./txQueue";
+import {
+  withSpan,
+  blockchainTxCounter,
+  blockchainTxLatency,
+  SpanKind,
+} from "./telemetry";
 
 async function callContract(
   contractAddress: string,
@@ -61,7 +67,35 @@ async function callContract(
   functionArgs: any[],
   _senderKey: string = SERVER_PRIVATE_KEY
 ): Promise<string> {
-  return enqueueContractCall(contractAddress, contractName, functionName, functionArgs);
+  // Wrap every Stacks write in a CLIENT span so blockchain settlement appears
+  // as the tail of the distributed trace (agent → FoxMQ → shard → chain), and
+  // record tx latency + count for the SigNoz dashboard.
+  const started = Date.now();
+  return withSpan(
+    `stacks ${contractName}.${functionName}`,
+    {
+      "db.system": "stacks",
+      "wog.contract": `${contractAddress}.${contractName}`,
+      "wog.contract.function": functionName,
+      "wog.network": USE_MAINNET ? "mainnet" : "testnet",
+    },
+    async (span) => {
+      try {
+        const txid = await enqueueContractCall(
+          contractAddress, contractName, functionName, functionArgs,
+        );
+        span.setAttribute("wog.txid", txid);
+        blockchainTxCounter.add(1, { function: functionName, result: "ok" });
+        return txid;
+      } catch (err) {
+        blockchainTxCounter.add(1, { function: functionName, result: "error" });
+        throw err;
+      } finally {
+        blockchainTxLatency.record(Date.now() - started, { function: functionName });
+      }
+    },
+    SpanKind.CLIENT,
+  );
 }
 
 // ============================================================

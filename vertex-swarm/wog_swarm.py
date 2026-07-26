@@ -49,6 +49,13 @@ from collections import deque
 from enum import Enum, auto
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import MQTTProtocolVersion
+from paho.mqtt.properties import Properties
+from paho.mqtt.packettypes import PacketTypes
+
+# ── Observability (SigNoz / OpenTelemetry) ───────────────────────────────────
+# All telemetry lives in otel_swarm.py and degrades to no-ops if OTel isn't
+# installed or SIGNOZ_INGESTION_KEY is unset, so the swarm still runs offline.
+import otel_swarm as otel
 
 # Windows terminal UTF-8 fix
 if hasattr(sys.stdout, 'reconfigure'):
@@ -160,10 +167,41 @@ def now_ms() -> int:
 
 _pub_seq = 0
 def publish_json(client, topic: str, payload: dict, qos: int = 1):
+    """
+    Publish a JSON message to FoxMQ, wrapped in an OTel PRODUCER span.
+
+    The active trace context (W3C traceparent) is injected into MQTT 5.0
+    user properties so a receiving agent — or the TS shard — continues the
+    SAME distributed trace across the broker. This is what makes one agent
+    decision show up in SigNoz as a single connected trace spanning
+    Python agent → FoxMQ → shard → Stacks.
+    """
     global _pub_seq
     _pub_seq += 1
     payload["seq"] = _pub_seq
-    client.publish(topic, json.dumps(payload), qos=qos)
+
+    tracer = otel.get_tracer()
+    with tracer.start_as_current_span(
+        f"FoxMQ publish {topic}",
+        kind=otel.span_kind_producer(),
+    ) as span:
+        span.set_attribute("messaging.system", "foxmq")
+        span.set_attribute("messaging.destination.name", topic)
+        span.set_attribute("messaging.operation", "publish")
+        span.set_attribute("wog.seq", _pub_seq)
+        if "agent" in payload:
+            span.set_attribute("wog.agent", payload["agent"])
+
+        # Inject W3C context into MQTT5 user properties.
+        carrier: dict = {}
+        otel.inject_context(carrier)
+        props = Properties(PacketTypes.PUBLISH)
+        if carrier:
+            props.UserProperty = [(k, v) for k, v in carrier.items()]
+
+        client.publish(topic, json.dumps(payload), qos=qos, properties=props)
+
+    otel.m_messages_published.add(1, {"topic": topic, "agent": payload.get("agent", "?")})
 
 def fmt_hp(hp: int, max_hp: int) -> str:
     pct = hp / max_hp
@@ -262,6 +300,30 @@ class WoGAgent:
         if not sender or sender == self.name:
             return
         topic = msg.topic
+
+        # Pull the W3C trace context out of MQTT5 user properties so this
+        # handler's span links back to the publisher's span → one trace.
+        carrier = {}
+        user_props = getattr(getattr(msg, "properties", None), "UserProperty", None)
+        if user_props:
+            carrier = {k: v for k, v in user_props}
+        parent_ctx = otel.extract_context(carrier)
+
+        tracer = otel.get_tracer()
+        with tracer.start_as_current_span(
+            f"FoxMQ receive {topic}",
+            context=parent_ctx,
+            kind=otel.span_kind_consumer(),
+        ) as span:
+            span.set_attribute("messaging.system", "foxmq")
+            span.set_attribute("messaging.destination.name", topic)
+            span.set_attribute("messaging.operation", "receive")
+            span.set_attribute("wog.agent", self.name)
+            span.set_attribute("wog.sender", sender)
+            span.set_attribute("wog.seq", data.get("seq", -1))
+            self._dispatch_message(topic, sender, data)
+
+    def _dispatch_message(self, topic, sender, data):
         with self.lock:
             dispatch = {
                 "wog/heartbeat":         self._handle_heartbeat,
@@ -277,6 +339,7 @@ class WoGAgent:
                 "wog/property/offer":    self._handle_property_offer,
                 "wog/property/sold":     self._handle_property_sold,
                 "wog/property/distress": self._handle_property_distress,
+                "wog/heal/redistribute": self._handle_redistribute,
             }
             if topic in dispatch:
                 dispatch[topic](sender, data)
@@ -294,14 +357,44 @@ class WoGAgent:
                 if owner == sender:
                     del self.zone_claims[zone]
 
+    def _handle_redistribute(self, sender, data):
+        """
+        SigNoz-driven self-heal: the selfheal controller (fed by a SigNoz
+        Alert) told the mesh that `dead_agent` is down. Free its zone and quest
+        claims so a live agent can take over. This is the recovery step of the
+        "self-healing infra with SigNoz metrics" loop, and it runs inside the
+        consumer span, so the recovery is visible in SigNoz linked to the alert.
+        """
+        dead = data.get("dead_agent", "")
+        if not dead or dead == self.name:
+            return
+        reason = data.get("reason", "unknown")
+        freed_zones = [z for z, o in self.zone_claims.items() if o == dead]
+        freed_quests = [q for q, o in self.quest_claims.items() if o == dead]
+        for z in freed_zones:
+            del self.zone_claims[z]
+        for q in freed_quests:
+            del self.quest_claims[q]
+        # Mark the peer stale so normal recovery logic stays consistent.
+        if dead in self.peers:
+            self.peers[dead]["stale"] = True
+        print(f"  {self.emoji} [{self.name}] 🩹 SELF-HEAL ({reason}): freed {dead}'s "
+              f"{len(freed_zones)} zone(s), {len(freed_quests)} quest(s)")
+        otel.m_consensus_wins.add(
+            len(freed_zones) + len(freed_quests),
+            {"kind": "selfheal_reclaim", "healer": self.name})
+
     def _handle_zone_claim(self, sender, data):
         zone = data.get("zone", "")
         seq  = data.get("seq", "?")
         if zone not in self.zone_claims:
             self.zone_claims[zone] = sender
             print(f"  [{self.name}] CONSENSUS ZONE GRANT  seq={seq}: {sender} → [{zone}]")
+            otel.m_consensus_wins.add(1, {"kind": "zone", "winner": sender})
         elif self.zone_claims[zone] != sender:
             print(f"  [{self.name}] CONSENSUS ZONE REJECT seq={seq}: {sender} conflicts with {self.zone_claims[zone]} on [{zone}] — {self.zone_claims[zone]} WINS")
+            otel.m_consensus_conflicts.add(
+                1, {"kind": "zone", "loser": sender, "winner": self.zone_claims[zone]})
 
     def _handle_zone_yield(self, sender, data):
         zone = data.get("zone", "")
@@ -761,7 +854,23 @@ class WoGAgent:
     # ═══════════════════════════════════════════════════════════════════
 
     def _tick(self):
-        """Main decision tick — runs FSM then utility scoring."""
+        """Main decision tick — runs FSM then utility scoring, inside a span."""
+        tracer = otel.get_tracer()
+        with tracer.start_as_current_span("agent.tick") as span:
+            span.set_attribute("wog.agent", self.name)
+            span.set_attribute("wog.state", self.state.name)
+            span.set_attribute("wog.hp", self.hp)
+            span.set_attribute("wog.gold", self.gold)
+            span.set_attribute("wog.level", self.level)
+            span.set_attribute("wog.zone", self.zone or "none")
+            span.set_attribute("wog.properties", len(self.owned_properties))
+            # Per-tick gauges → SigNoz dashboard (per-agent HP/gold timeseries).
+            attrs = {"agent": self.name, "class": self.cls}
+            otel.m_hp.set(self.hp, attrs)
+            otel.m_gold.set(self.gold, attrs)
+            self._tick_body()
+
+    def _tick_body(self):
         # Passive income every tick regardless of state
         if self.passive_income > 0:
             self.gold += self.passive_income
@@ -1004,6 +1113,7 @@ class WoGAgent:
 
 # ════════════════════════════════════════════════════════════════════════════
 def run_single(name: str):
+    otel.init_otel(name)
     agent = WoGAgent(name)
     agent.connect()
     agent.start_threads()
@@ -1014,6 +1124,7 @@ def run_single(name: str):
         print(f"\n{PERSONALITIES[name]['emoji']} [{name}] Disconnecting...")
 
 def run_all():
+    otel.init_otel("swarm")
     print("=" * 72)
     print("  World of Guilds — Leaderless P2P Agent Economy")
     print("  Vertex Swarm Challenge 2026 | Track 3: The Agent Economy")

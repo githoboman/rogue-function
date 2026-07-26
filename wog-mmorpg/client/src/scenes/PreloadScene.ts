@@ -42,6 +42,41 @@ export class PreloadScene extends Phaser.Scene {
       frameWidth: 16, frameHeight: 16, spacing: 1,
     });
 
+    // ── Ninja Adventure (CC0) — characters + landscape tilesets ──────
+    // Character Walk sheets are 64×64 = 4 dirs (rows: down,up,left,right) × 4
+    // frames (cols). Idle sheets are 64×16 (one frame per direction).
+    // Class → character mapping (swappable):
+    const NA_CHARS: Record<string, string> = {
+      warrior: "Knight", mage: "Master", rogue: "NinjaDark", ranger: "Hunter",
+      // sensible reuse for the other classes the server may send:
+      cleric: "Monk", paladin: "KnightGold", necromancer: "NinjaMageBlack", druid: "Master",
+    };
+    const NA_BASE = "/assets/ninja-adventure/Actor/Character";
+    for (const [cls, name] of Object.entries(NA_CHARS)) {
+      this.load.spritesheet(`na_walk_${cls}`, `${NA_BASE}/${name}/SeparateAnim/Walk.png`, {
+        frameWidth: 16, frameHeight: 16,
+      });
+      this.load.spritesheet(`na_idle_${cls}`, `${NA_BASE}/${name}/SeparateAnim/Idle.png`, {
+        frameWidth: 16, frameHeight: 16,
+      });
+    }
+    // A couple of monster sheets for mobs (Walk = 64×64 same layout).
+    const NA_MON = "/assets/ninja-adventure/Actor/Monster";
+    for (const mon of ["Bear", "Beast", "Larva", "GreenOctopus"]) {
+      this.load.spritesheet(`na_mon_${mon.toLowerCase()}`, `${NA_MON}/${mon}/SeparateAnim/Walk.png`, {
+        frameWidth: 16, frameHeight: 16,
+      });
+    }
+    // Landscape tilesets (16×16 tiles, no spacing).
+    const NA_TILES = "/assets/ninja-adventure/Backgrounds/Tilesets";
+    const tilesets: Record<string, string> = {
+      na_field: "TilesetField", na_nature: "TilesetNature", na_water: "TilesetWater",
+      na_relief: "TilesetRelief", na_dungeon: "TilesetDungeon", na_village: "TilesetVillageAbandoned",
+    };
+    for (const [key, file] of Object.entries(tilesets)) {
+      this.load.spritesheet(key, `${NA_TILES}/${file}.png`, { frameWidth: 16, frameHeight: 16 });
+    }
+
     // Gracefully handle missing files — GameScene has shape fallbacks
     this.load.on("loaderror", (file: any) => {
       console.warn(`⚠️  Asset not found: ${file.key} (${file.url}) — using placeholders`);

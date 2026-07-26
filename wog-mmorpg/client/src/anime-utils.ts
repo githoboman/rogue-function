@@ -217,6 +217,74 @@ export function idleBreathe(
   breathe();
 }
 
+// ── Sprite locomotion ("walk juice") ─────────────────────────────────────────
+
+/**
+ * A walking body reads as walking (not sliding) when it bobs + leans while the
+ * container tween carries it. Call walkCycle() with the *body* graphic when a
+ * move starts; it loops until stop() is called. Bob is vertical, lean is a
+ * slight rotation into the travel direction.
+ *
+ * Returns a stop() that settles the body back to rest.
+ */
+export function walkCycle(
+  body: { y: number; rotation?: number; scaleX: number; scaleY: number },
+  opts: { dir?: number; bob?: number; baseY?: number } = {},
+): () => void {
+  const bob = opts.bob ?? 4;
+  const baseY = opts.baseY ?? body.y;
+  const lean = (opts.dir ?? 0) >= 0 ? 0.05 : -0.05; // radians (~3°)
+  let alive = true;
+
+  const step = (up: boolean) => {
+    if (!alive) return;
+    animate(body, {
+      y: up ? baseY - bob : baseY,
+      rotation: up ? lean : lean * 0.4,
+      duration: 150,
+      easing: "easeInOutSine",
+      onComplete: () => step(!up),
+    });
+  };
+  step(true);
+
+  return () => {
+    alive = false;
+    // Settle upright at rest.
+    animate(body, { y: baseY, rotation: 0, duration: 140, easing: "easeOutQuad" });
+  };
+}
+
+/**
+ * Anticipation squash when a sprite starts moving — brief flatten/widen.
+ */
+export function squashStart(body: { scaleX: number; scaleY: number }, baseX: number, baseY: number) {
+  animate(body, {
+    scaleX: baseX * 1.12,
+    scaleY: baseY * 0.88,
+    duration: 90,
+    easing: "easeOutQuad",
+    onComplete: () => {
+      animate(body, { scaleX: baseX, scaleY: baseY, duration: 120, easing: "easeOutBack" });
+    },
+  });
+}
+
+/**
+ * Landing stretch-and-settle when a sprite arrives at its destination.
+ */
+export function stretchArrive(body: { scaleX: number; scaleY: number }, baseX: number, baseY: number) {
+  animate(body, {
+    scaleX: baseX * 0.9,
+    scaleY: baseY * 1.12,
+    duration: 100,
+    easing: "easeOutQuad",
+    onComplete: () => {
+      animate(body, { scaleX: baseX, scaleY: baseY, duration: 220, easing: "easeOutElastic" });
+    },
+  });
+}
+
 // ── UI DOM animations ────────────────────────────────────────────────────────
 
 /**

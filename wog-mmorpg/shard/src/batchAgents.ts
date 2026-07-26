@@ -24,7 +24,73 @@ import { printStandings, SPRINT_SUBMIT_INTERVAL } from "./aibtcSprint";
 
 const TICK_MS = 30000;          // How often agents act (ms) — 30s to stay well within rate limits
 const SERVER_URL = process.env.SHARD_SERVER_URL || `http://127.0.0.1:${process.env.PORT || "3000"}`;
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+
+// ── LLM provider config (provider-agnostic) ────────────────────────────────
+// Priority:
+//   1. LLM_API_KEY + LLM_BASE_URL  → any OpenAI-compatible endpoint
+//        (NVIDIA NIM  : https://integrate.api.nvidia.com/v1
+//         OpenRouter  : https://openrouter.ai/api/v1   — free :free models)
+//   2. ANTHROPIC_API_KEY           → Anthropic API directly (native SDK)
+// Set AGENT_MODEL to the provider's model id (e.g. nvidia/nemotron-nano-9b-v2,
+// google/gemma-4-31b-it, claude-haiku-4-5-20251001).
+const LLM_BASE_URL = process.env.LLM_BASE_URL || "";
+const LLM_API_KEY = process.env.LLM_API_KEY || "";
+const USE_OPENAI_COMPAT = !!(LLM_BASE_URL && LLM_API_KEY);
+
+// Anthropic client kept for the direct-Anthropic path (and BYO-gateway).
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "unused" });
+
+const AGENT_MODEL =
+  process.env.AGENT_MODEL ||
+  (USE_OPENAI_COMPAT ? "nvidia/nemotron-nano-9b-v2" : "claude-haiku-4-5-20251001");
+
+const LLM_SYSTEM =
+  "You are a game AI controller. Always respond with only valid JSON arrays. No markdown, no explanation.";
+
+/**
+ * Provider-agnostic LLM call. Returns the raw text completion so the existing
+ * JSON-extraction logic works unchanged, regardless of provider.
+ * Throws on error (caller handles retry + fallback exactly as before).
+ */
+async function callLLM(prompt: string): Promise<string> {
+  if (USE_OPENAI_COMPAT) {
+    const res = await fetch(`${LLM_BASE_URL.replace(/\/$/, "")}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${LLM_API_KEY}`,
+        // OpenRouter attribution headers (ignored by other providers).
+        "HTTP-Referer": "https://github.com/githoboman/rogue-function",
+        "X-Title": "World of Guilds",
+      },
+      body: JSON.stringify({
+        model: AGENT_MODEL,
+        max_tokens: 400,
+        messages: [
+          { role: "system", content: LLM_SYSTEM },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      const err: any = new Error(`LLM ${res.status}: ${body.slice(0, 200)}`);
+      err.status = res.status;
+      throw err;
+    }
+    const data: any = await res.json();
+    return data.choices?.[0]?.message?.content ?? "";
+  }
+
+  // Anthropic-native path
+  const response = await client.messages.create({
+    model: AGENT_MODEL,
+    max_tokens: 400,
+    messages: [{ role: "user", content: prompt }],
+    system: LLM_SYSTEM,
+  });
+  return response.content[0]?.type === "text" ? response.content[0].text : "";
+}
 
 // AI pause toggle — controllable via env var or runtime API
 let aiPaused = (process.env.AI_PAUSED || "false").toLowerCase() === "true";
@@ -367,15 +433,10 @@ Respond with ONLY a JSON array, one object per agent, in the SAME ORDER as liste
     return decisions;
   }
 
-  // Non-streaming call (lower memory usage)
-  let response;
+  // Non-streaming call (lower memory usage) — provider-agnostic
+  let text: string;
   try {
-    response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 400,
-      messages: [{ role: "user", content: prompt }],
-      system: "You are a game AI controller. Always respond with only valid JSON arrays. No markdown, no explanation.",
-    });
+    text = await callLLM(prompt);
   } catch (e: any) {
     if (e?.status === 429 && retryCount < 3) {
       const wait = Math.min(60000, (retryCount + 1) * 20000);
@@ -383,7 +444,7 @@ Respond with ONLY a JSON array, one object per agent, in the SAME ORDER as liste
       await sleep(wait);
       return batchDecide(agents, retryCount + 1);
     }
-    console.error(`⚠️  Claude API error: ${e.message || e}`);
+    console.error(`⚠️  LLM error: ${e.message || e}`);
     // Fallback AI — make smart random decisions so the game stays alive
     console.log(`🤖 Fallback AI kicking in for ${agents.length} agents`);
     for (let i = 0; i < agents.length; i++) {
@@ -396,7 +457,6 @@ Respond with ONLY a JSON array, one object per agent, in the SAME ORDER as liste
   }
 
   // Parse all decisions from the response
-  const text = response.content[0]?.type === "text" ? response.content[0].text : "";
   const matches = text.matchAll(/\{[^{}]+\}/g);
   for (const match of matches) {
     try {
@@ -713,7 +773,8 @@ async function main(): Promise<void> {
 ║       WoG MMORPG — Batch Agent System        ║
 ╠══════════════════════════════════════════════╣
 ║  Agents    : ${String(agentCount).padEnd(30)} ║
-║  Model     : claude-sonnet-4-5               ║
+║  Model     : ${AGENT_MODEL.padEnd(30)} ║
+║  Provider  : ${(USE_OPENAI_COMPAT ? "OpenAI-compat (" + LLM_BASE_URL.replace(/^https?:\/\//,"").split("/")[0] + ")" : "Anthropic").padEnd(30)} ║
 ║  Mode      : Batched + Streaming             ║
 ║  API calls : 1 per tick (not ${agentCount} per tick)      ║
 ╚══════════════════════════════════════════════╝

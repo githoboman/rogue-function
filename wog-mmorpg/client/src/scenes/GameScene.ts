@@ -90,6 +90,9 @@ interface AgentSprite {
   container: Phaser.GameObjects.Container;
   body: Phaser.GameObjects.Graphics;
   sprite: Phaser.GameObjects.Image | null;
+  animSprite: Phaser.GameObjects.Sprite | null; // Ninja Adventure animated sprite
+  clsKey: string;                                // lowercased class for anim keys
+  facing: "down" | "up" | "left" | "right";
   hpBar: Phaser.GameObjects.Graphics;
   nameLabel: Phaser.GameObjects.Text;
   levelLabel: Phaser.GameObjects.Text;
@@ -130,6 +133,8 @@ export class GameScene extends Phaser.Scene {
   private cam!: Phaser.Cameras.Scene2D.Camera;
   private hasCharSprites = false;
   private hasTownTiles = false;
+  private hasNinjaChars = false;
+  private hasNinjaTiles = false;
 
   private readonly W = 1024;
   private readonly H = 720;
@@ -149,6 +154,21 @@ export class GameScene extends Phaser.Scene {
     // Check which spritesheets loaded successfully
     this.hasCharSprites = this.textures.exists("chars") && this.textures.get("chars").key !== "__MISSING";
     this.hasTownTiles = this.textures.exists("town") && this.textures.get("town").key !== "__MISSING";
+
+    // Ninja Adventure (CC0) — preferred art if it loaded.
+    // Guard against Phaser's __MISSING placeholder (created on load failure).
+    const okTex = (key: string) =>
+      this.textures.exists(key) && this.textures.get(key).key !== "__MISSING";
+    this.hasNinjaChars = okTex("na_walk_warrior");
+    this.hasNinjaTiles = okTex("na_field") && okTex("na_nature");
+    // Loud debug so we can see exactly what loaded (check browser console).
+    console.log("[ART] ninjaChars=%s ninjaTiles=%s | walk_warrior exists=%s missing=%s",
+      this.hasNinjaChars, this.hasNinjaTiles,
+      this.textures.exists("na_walk_warrior"),
+      this.textures.exists("na_walk_warrior") && this.textures.get("na_walk_warrior").key === "__MISSING");
+    console.log("[ART] all na_ textures:",
+      this.textures.getTextureKeys().filter((k) => k.startsWith("na_")));
+    if (this.hasNinjaChars) this.registerNinjaAnims();
 
 
     this.cam = this.cameras.main;
@@ -183,6 +203,51 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.wireEvents();
+
+    // Demo agents: if no backend feeds real agents within 2.5s, spawn a few
+    // so the Ninja Adventure character sprites are visible (and walking)
+    // without a running shard/swarm. Real agents override these by id.
+    this.time.delayedCall(2500, () => this.maybeSpawnDemoAgents());
+  }
+
+  private demoActive = false;
+  private maybeSpawnDemoAgents() {
+    if (this.agentSprites.size > 0) return; // real agents arrived — do nothing
+    this.demoActive = true;
+    const demo: Array<[string, string, string]> = [
+      ["demo-ragnar", "Ragnar", "Warrior"],
+      ["demo-lyria", "Lyria", "Mage"],
+      ["demo-kira", "Kira", "Rogue"],
+    ];
+    for (const [id, name, cls] of demo) {
+      this.upsertAgent(id, {
+        playerId: id, zone: this.currentZone,
+        position: { x: Phaser.Math.Between(80, 420), y: Phaser.Math.Between(80, 300) },
+        health: 90, maxHealth: 120, level: Phaser.Math.Between(4, 10), xp: 0,
+        inventory: [], activeQuests: [], nearbyEntities: [],
+      }, name, cls);
+    }
+    // Wander loop — move demo agents around so the walk animation plays.
+    this.time.addEvent({
+      delay: 2200, loop: true,
+      callback: () => {
+        if (!this.demoActive) return;
+        for (const [id] of demo) {
+          const s = this.agentSprites.get(id);
+          if (!s) continue;
+          this.upsertAgent(id, {
+            playerId: id, zone: this.currentZone,
+            position: {
+              x: Phaser.Math.Between(60, this.W / WORLD_SCALE - 60),
+              y: Phaser.Math.Between(60, this.H / WORLD_SCALE - 60),
+            },
+            health: 90, maxHealth: 120, level: 6, xp: 0,
+            inventory: [], activeQuests: [], nearbyEntities: [],
+          }, id.replace("demo-", "").replace(/^./, (c) => c.toUpperCase()),
+             id.includes("ragnar") ? "Warrior" : id.includes("lyria") ? "Mage" : "Rogue");
+        }
+      },
+    });
   }
 
   // ── Ground ─────────────────────────────────────────────
@@ -199,14 +264,79 @@ export class GameScene extends Phaser.Scene {
       this.drawGraphicsGround(pal, isDark);
     }
 
-    // Trees on top
-    if (pal.trees) {
-      this.drawTrees(pal);
+    // Trees on top — prefer Ninja Adventure nature tiles.
+    if (this.hasNinjaTiles) {
+      this.drawNinjaNature();
+    } else {
+      if (pal.trees) this.drawTrees(pal);
+      if (this.currentZone === "human_meadow") this.drawTrees({ ...pal, trees: true });
     }
+  }
 
-    // Human meadow gets some trees at edges too (lighter coverage)
-    if (this.currentZone === "human_meadow") {
-      this.drawTrees({ ...pal, trees: true });
+  /**
+   * Scatter Ninja Adventure nature decorations (trees, bushes, rocks) from
+   * TilesetNature (24 cols × 21 rows, 16px). Trees are assembled from 3×3
+   * tile blocks; bushes/rocks are single or 2×2. Counts/palette vary by zone.
+   */
+  private drawNinjaNature() {
+    const COLS = 24;
+    const idx = (col: number, row: number) => row * COLS + col;
+    // 3×3 tree blocks keyed by top-left tile (col,row) in the sheet.
+    const TREE_GREEN = { c: 0, r: 0 };
+    const TREE_AUTUMN = { c: 0, r: 6 };
+    const TREE_PINK = { c: 15, r: 0 };
+    const TREE_DARK = { c: 0, r: 3 };
+    // Single-tile bushes / rocks (curated safe picks).
+    const BUSH = [idx(1, 15), idx(2, 15), idx(3, 15)];
+    const ROCK = [idx(16, 6), idx(17, 6), idx(16, 9)];
+
+    const zone = this.currentZone;
+    const treeBlock =
+      zone === "dark_forest" ? TREE_DARK :
+      zone === "wild_meadow" ? TREE_AUTUMN : TREE_GREEN;
+    const numTrees = zone === "dark_forest" ? 26 : zone === "human_meadow" ? 10 : 18;
+    const numBushes = zone === "human_meadow" ? 22 : 16;
+    const numRocks = zone === "dark_forest" ? 14 : 8;
+    const scale = 2.4;
+    const ts = 16 * scale;
+
+    // Assemble a 3×3 tree at world (x,y) with its base (feet) at y.
+    const placeTree = (x: number, y: number, block: { c: number; r: number }) => {
+      for (let ry = 0; ry < 3; ry++) {
+        for (let rx = 0; rx < 3; rx++) {
+          const frame = idx(block.c + rx, block.r + ry);
+          const img = this.add.image(
+            x + (rx - 1) * ts,
+            y + (ry - 3) * ts + ts, // base sits on y
+            "na_nature", frame,
+          ).setScale(scale).setOrigin(0.5, 0.5);
+          if (zone === "dark_forest") img.setTint(0x8899bb);
+          this.groundLayer.add(img);
+        }
+      }
+    };
+
+    for (let i = 0; i < numTrees; i++) {
+      const x = Phaser.Math.Between(Math.floor(ts * 1.5), this.W - Math.floor(ts * 1.5));
+      const y = this.treeY(i, numTrees);
+      // Occasional variety tree
+      const block = (zone === "human_meadow" && i % 4 === 0) ? TREE_PINK : treeBlock;
+      placeTree(x, y, block);
+    }
+    for (let i = 0; i < numBushes; i++) {
+      const x = Phaser.Math.Between(10, this.W - 10);
+      const y = Phaser.Math.Between(40, this.H - 20);
+      const f = BUSH[Phaser.Math.Between(0, BUSH.length - 1)];
+      const img = this.add.image(x, y, "na_nature", f).setScale(scale * 0.85).setOrigin(0.5, 0.7);
+      if (zone === "dark_forest") img.setTint(0x7788aa);
+      this.groundLayer.add(img);
+    }
+    for (let i = 0; i < numRocks; i++) {
+      const x = Phaser.Math.Between(20, this.W - 20);
+      const y = Phaser.Math.Between(40, this.H - 20);
+      const f = ROCK[Phaser.Math.Between(0, ROCK.length - 1)];
+      this.groundLayer.add(
+        this.add.image(x, y, "na_nature", f).setScale(scale).setOrigin(0.5, 0.7));
     }
   }
 
@@ -653,8 +783,15 @@ export class GameScene extends Phaser.Scene {
       c.add(this.add.circle(0, 2, 16, glowColor, 0.10));
       c.add(this.add.ellipse(0, 14, 20, 6, 0x000000, 0.25)); // shadow
 
-      // NPC body — sprite or fallback
-      if (this.hasCharSprites) {
+      // NPC body — prefer Ninja Adventure art, then Kenney, then graphics.
+      if (this.hasNinjaChars) {
+        // Villagers use a non-combat class sprite (Master/Monk look).
+        const npcKey = npc.role === "Shop" ? "na_walk_mage" : "na_walk_cleric";
+        const useKey = this.textures.exists(npcKey) ? npcKey : "na_walk_warrior";
+        const npcSprite = this.add.sprite(0, -2, useKey, 0).setScale(2.2).setOrigin(0.5, 0.85);
+        c.add(npcSprite);
+        idleBreathe(npcSprite, npcSprite.scaleX, npcSprite.scaleY);
+      } else if (this.hasCharSprites) {
         const npcSprite = this.add.image(0, -2, "chars", npc.charFrame).setScale(2);
         c.add(npcSprite);
         // Gentle idle bob via anime.js
@@ -787,6 +924,14 @@ export class GameScene extends Phaser.Scene {
   // ── Agent Sprites ──────────────────────────────────────
 
   public upsertAgent(playerId: string, state: PlayerState, name: string, cls: string) {
+    // A real (non-demo) agent arriving clears the demo placeholders.
+    if (this.demoActive && !playerId.startsWith("demo-")) {
+      this.demoActive = false;
+      for (const [id, s] of [...this.agentSprites.entries()]) {
+        if (id.startsWith("demo-")) { s.container.destroy(); this.agentSprites.delete(id); }
+      }
+    }
+
     if (state.zone !== this.currentZone) {
       this.agentSprites.get(playerId)?.container.setVisible(false);
       return;
@@ -808,8 +953,21 @@ export class GameScene extends Phaser.Scene {
     const dy = ty - s.y;
     const moved = Math.abs(dx) > 2 || Math.abs(dy) > 2;
 
-    // Flip body to face movement direction
-    if (Math.abs(dx) > 4) {
+    if (s.animSprite) {
+      // Animated Ninja Adventure sprite: play directional walk while moving,
+      // pause on the standing frame when idle.
+      if (moved) {
+        const dir = this.dirFromDelta(dx, dy);
+        if (dir !== s.facing || !s.animSprite.anims.isPlaying) {
+          s.facing = dir;
+          const key = `walk_${s.clsKey}_${dir}`;
+          if (this.anims.exists(key)) s.animSprite.anims.play(key, true);
+        }
+      } else if (s.animSprite.anims.isPlaying) {
+        s.animSprite.anims.pause();
+      }
+    } else if (Math.abs(dx) > 4) {
+      // Procedural fallback: flip body to face movement direction.
       const absX = Math.abs(s.body.scaleX);
       s.body.setScale(dx < 0 ? -absX : absX, s.body.scaleY);
     }
@@ -820,6 +978,10 @@ export class GameScene extends Phaser.Scene {
         x: tx, y: ty,
         duration: 420,
         easing: "easeOutCubic",
+        onComplete: () => {
+          // settle to idle frame when the tween finishes and no new move came
+          if (s.animSprite && s.x === tx && s.y === ty) s.animSprite.anims.pause();
+        },
       });
     }
     s.x = tx; s.y = ty;
@@ -1173,6 +1335,44 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Register walk/idle animations for every class from the Ninja Adventure
+   * Walk sheets (64×64 = 4 dirs × 4 frames; rows: down, up, left, right).
+   */
+  private registerNinjaAnims() {
+    const classes = ["warrior", "mage", "rogue", "ranger", "cleric", "paladin", "necromancer", "druid"];
+    const DIRS = ["down", "up", "left", "right"]; // row order
+    for (const cls of classes) {
+      const key = `na_walk_${cls}`;
+      if (!this.textures.exists(key)) continue;
+      DIRS.forEach((dir, row) => {
+        const walkKey = `walk_${cls}_${dir}`;
+        if (this.anims.exists(walkKey)) return;
+        this.anims.create({
+          key: walkKey,
+          frames: this.anims.generateFrameNumbers(key, { start: row * 4, end: row * 4 + 3 }),
+          frameRate: 8, repeat: -1,
+        });
+      });
+    }
+    // Monster walk anims (single "down" walk is enough for wandering mobs).
+    for (const mon of ["bear", "beast", "larva", "greenoctopus"]) {
+      const key = `na_mon_${mon}`;
+      if (!this.textures.exists(key) || this.anims.exists(`mon_walk_${mon}`)) continue;
+      this.anims.create({
+        key: `mon_walk_${mon}`,
+        frames: this.anims.generateFrameNumbers(key, { start: 0, end: 3 }),
+        frameRate: 6, repeat: -1,
+      });
+    }
+  }
+
+  /** Direction row-name from a movement delta. */
+  private dirFromDelta(dx: number, dy: number): "down" | "up" | "left" | "right" {
+    if (Math.abs(dx) > Math.abs(dy)) return dx < 0 ? "left" : "right";
+    return dy < 0 ? "up" : "down";
+  }
+
   private mkAgent(name: string, cls: string): AgentSprite {
     const cfg = CLASS_CONFIG[cls] || CLASS_CONFIG.Warrior;
     // Scale factor: pixel-art units → screen pixels.
@@ -1189,13 +1389,30 @@ export class GameScene extends Phaser.Scene {
     // ── Class ambient glow disc ──────────────────────────────
     c.add(this.add.circle(0, -8, 20, cfg.glow, 0.08));
 
-    // ── Pixel-art character body ─────────────────────────────
+    // ── Character body ───────────────────────────────────────
+    // Prefer the Ninja Adventure animated sprite; fall back to procedural art.
+    const clsKey = (cls || "warrior").toLowerCase();
     const body = this.add.graphics();
-    body.setScale(SC);
-    // The pixel art is drawn at 1px coords, then scaled — origin offset so feet = y:0
-    this.drawCharBody(body, cfg);
-    c.add(body);
-    const sprite: Phaser.GameObjects.Image | null = null; // always graphics now
+    let animSprite: Phaser.GameObjects.Sprite | null = null;
+
+    if (this.hasNinjaChars && this.textures.exists(`na_walk_${clsKey}`)) {
+      // 16×16 art scaled up; origin at feet (y:0) so it stands on the shadow.
+      animSprite = this.add.sprite(0, 0, `na_walk_${clsKey}`, 0);
+      animSprite.setOrigin(0.5, 0.85);
+      animSprite.setScale(SC);
+      // start idle (first frame of "down")
+      if (this.anims.exists(`walk_${clsKey}_down`)) {
+        animSprite.anims.play(`walk_${clsKey}_down`);
+        animSprite.anims.pause();
+      }
+      c.add(animSprite);
+    } else {
+      body.setScale(SC);
+      // The pixel art is drawn at 1px coords, then scaled — origin offset so feet = y:0
+      this.drawCharBody(body, cfg);
+      c.add(body);
+    }
+    const sprite: Phaser.GameObjects.Image | null = null;
 
     // ── HP bar ───────────────────────────────────────────────
     const hpBar = this.add.graphics();
@@ -1245,8 +1462,9 @@ export class GameScene extends Phaser.Scene {
     hit.on("pointerover", () => { glowRing.setAlpha(0.18); });
     hit.on("pointerout",  () => { glowRing.setAlpha(0.0); });
 
-    // ── Idle breathing on body ───────────────────────────────
-    idleBreathe(body, body.scaleX, body.scaleY);
+    // ── Idle breathing on whichever body is showing ──────────
+    const breatheTarget = animSprite ?? body;
+    idleBreathe(breatheTarget, breatheTarget.scaleX, breatheTarget.scaleY);
 
     // Glow ring pulse
     (function pulseRing() {
@@ -1255,7 +1473,8 @@ export class GameScene extends Phaser.Scene {
     })();
 
     return {
-      container: c, body, sprite, hpBar, nameLabel, levelLabel, actionLabel, statusIcon, glowRing,
+      container: c, body, sprite, animSprite, clsKey, facing: "down",
+      hpBar, nameLabel, levelLabel, actionLabel, statusIcon, glowRing,
       cls, x: 100, y: 100, lastHp: 100, lastMaxHp: 100,
       isMoving: false, currentAction: "",
     };

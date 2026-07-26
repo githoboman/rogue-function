@@ -2,3 +2,6 @@ foxmq-bin/
 foxmq.zip
 *.log
 __pycache__/
+.env
+venv/
+.venv/

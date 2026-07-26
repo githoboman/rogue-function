@@ -4,21 +4,23 @@
   <meta charset="UTF-8" />
   <title>WoG MMORPG</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap');
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    h1, h2, h3, .overlay-title, .agent-name, .nav-tab-label { font-family: 'Outfit', sans-serif; }
     body {
-      background: #06060c; color: #d8cfc0; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      background: #040408; color: #e8e0d4; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
       overflow: hidden; display: flex; flex-direction: column; height: 100vh;
     }
 
     /* ── Topbar ─────────────────────────────────────────── */
     #topbar {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 20px; height: 48px; flex-shrink: 0;
-      background: rgba(10,10,18,0.95);
-      border-bottom: 1px solid rgba(200,168,75,0.08);
-      backdrop-filter: blur(12px); z-index: 50;
+      padding: 0 20px; height: 52px; flex-shrink: 0;
+      background: rgba(4, 4, 10, 0.7);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(24px) saturate(120%); -webkit-backdrop-filter: blur(24px) saturate(120%);
+      z-index: 50;
     }
     .topbar-left { display: flex; align-items: center; gap: 16px; }
     #topbar h1 {
@@ -39,13 +41,14 @@
     #connection-status.disconnected { color: #f44336; border-color: rgba(244,67,54,0.2); background: rgba(244,67,54,0.06); }
 
     #ai-toggle {
-      font-size: 9px; padding: 5px 14px; border-radius: 8px; font-weight: 700;
+      font-size: 10px; padding: 6px 16px; border-radius: 8px; font-weight: 800;
       border: 1px solid rgba(255,255,255,0.07); cursor: pointer;
-      transition: all 0.22s ease; font-family: inherit; letter-spacing: 0.5px;
-      display: flex; align-items: center; gap: 5px;
+      transition: all 0.22s ease; font-family: 'Outfit', sans-serif; letter-spacing: 0.5px;
+      display: flex; align-items: center; gap: 5px; text-transform: uppercase;
     }
     #ai-toggle.active {
-      color: #44cc66; background: rgba(68,204,102,0.08); border-color: rgba(68,204,102,0.2);
+      color: #44cc66; background: rgba(68,204,102,0.08); border-color: rgba(68,204,102,0.4);
+      box-shadow: 0 0 12px rgba(68,204,102,0.2);
     }
     #ai-toggle.paused {
       color: #ff9800; background: rgba(255,152,0,0.08); border-color: rgba(255,152,0,0.2);
@@ -62,14 +65,15 @@
     /* ── Zone Tabs ──────────────────────────────────────── */
     #zone-tabs { position: absolute; top: 10px; left: 10px; display: flex; gap: 5px; z-index: 10; }
     .zone-tab {
-      padding: 6px 14px; background: rgba(8,8,16,0.85); border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 8px; font-size: 10px; cursor: pointer; color: #555568;
-      font-weight: 600; transition: all 0.25s ease; backdrop-filter: blur(12px);
+      padding: 8px 16px; background: rgba(4,4,10,0.65); border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 12px; font-size: 11px; cursor: pointer; color: #555568; font-family: 'Outfit', sans-serif;
+      font-weight: 700; transition: all 0.25s ease; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     }
-    .zone-tab:hover { color: #9999aa; border-color: rgba(255,255,255,0.1); }
+    .zone-tab:hover { color: #9999aa; border-color: rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); }
     .zone-tab.active {
-      color: #e8c860; border-color: rgba(200,168,75,0.3);
-      background: linear-gradient(135deg, rgba(200,168,75,0.1) 0%, rgba(200,168,75,0.04) 100%);
+      color: #e8c860; border-color: rgba(200,168,75,0.4);
+      background: radial-gradient(ellipse at center, rgba(200,168,75,0.15) 0%, rgba(200,168,75,0.04) 100%);
+      box-shadow: 0 0 16px rgba(200,168,75,0.15);
     }
 
     /* ── Bottom Nav Bar ────────────────────────────────── */
@@ -132,18 +136,20 @@
     #overlay-panel {
       position: absolute; bottom: 58px; left: 0; right: 0;
       max-height: 46vh; overflow-y: auto; overflow-x: hidden;
-      background: rgba(5,5,11,0.97);
-      border-top: 1px solid rgba(200,168,75,0.09);
-      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      background: rgba(4, 4, 10, 0.65);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(48px) saturate(120%); -webkit-backdrop-filter: blur(48px) saturate(120%);
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
       z-index: 90; display: none;
     }
     #overlay-panel.open { display: block; }
     .overlay-header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 11px 18px; font-size: 10px; font-weight: 800;
-      letter-spacing: 2.5px; text-transform: uppercase; color: #7a6a40;
-      border-bottom: 1px solid rgba(200,168,75,0.05);
-      position: sticky; top: 0; background: rgba(5,5,11,0.99); z-index: 5;
+      padding: 14px 20px; font-size: 11px; font-weight: 800;
+      letter-spacing: 3px; text-transform: uppercase; color: #e8e0d4;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      position: sticky; top: 0; background: rgba(4, 4, 10, 0.7);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 5;
     }
     .overlay-header-left { display: flex; align-items: center; gap: 10px; }
     .overlay-header-icon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
@@ -160,9 +166,10 @@
     /* ── Agent Cards ────────────────────────────────────── */
     #agents-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; padding: 8px 12px; }
     .agent-card {
-      padding: 12px 14px; border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.04);
-      background: linear-gradient(135deg, rgba(18,18,28,0.9) 0%, rgba(14,14,22,0.8) 100%);
+      padding: 14px 16px; border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
       transition: all 0.3s ease; position: relative; overflow: hidden;
     }
     .agent-card::before {
@@ -378,7 +385,7 @@
       position: fixed; inset: 0; pointer-events: none; z-index: 200; overflow: hidden;
     }
     .dmg-popup {
-      position: absolute; font-family: 'Inter', Arial, sans-serif; font-weight: 900;
+      position: absolute; font-family: 'Outfit', sans-serif; font-weight: 900;
       font-size: 17px; color: #ff4040;
       text-shadow: 0 0 8px rgba(255,40,40,0.6), 0 2px 0 rgba(0,0,0,0.8);
       line-height: 1; white-space: nowrap; user-select: none;
@@ -390,36 +397,38 @@
       letter-spacing: -1px;
     }
     .float-label {
-      position: absolute; font-family: 'Inter', Arial, sans-serif; font-weight: 700;
+      position: absolute; font-family: 'Outfit', sans-serif; font-weight: 700;
       font-size: 13px; color: #66dd44;
       text-shadow: 0 0 6px rgba(80,220,60,0.4), 0 1px 0 rgba(0,0,0,0.7);
       line-height: 1; white-space: nowrap; user-select: none;
     }
     /* ── Event banner (level up, kill streak, quest) ── */
     .event-banner {
-      position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
-      display: flex; flex-direction: column; align-items: center; gap: 3px;
-      padding: 12px 32px; border-radius: 10px; pointer-events: none;
-      background: rgba(4,4,10,0.88); border: 1px solid rgba(255,255,255,0.08);
-      backdrop-filter: blur(12px);
+      position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 16px 40px; border-radius: 16px; pointer-events: none;
+      background: rgba(4,4,10,0.7); border: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(24px) saturate(120%); -webkit-backdrop-filter: blur(24px) saturate(120%);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.5);
     }
-    .banner-levelup { border-color: rgba(255,204,51,0.45); box-shadow: 0 0 32px rgba(255,204,51,0.2),0 0 0 1px rgba(255,204,51,0.1); }
-    .banner-streak  { border-color: rgba(255,80,40,0.45);  box-shadow: 0 0 32px rgba(255,80,40,0.2), 0 0 0 1px rgba(255,80,40,0.1);  }
-    .banner-quest   { border-color: rgba(80,200,100,0.45); box-shadow: 0 0 32px rgba(80,200,100,0.2),0 0 0 1px rgba(80,200,100,0.1); }
-    .banner-main { font-size: 20px; font-weight: 900; color: #fff; font-family: 'Inter', Arial, sans-serif; letter-spacing: 3px; text-transform: uppercase; }
-    .banner-sub  { font-size: 11px; color: rgba(255,255,255,0.45); font-family: 'Inter', Arial, sans-serif; letter-spacing: 1px; }
+    .banner-levelup { border-color: rgba(255,204,51,0.45); box-shadow: 0 0 32px rgba(255,204,51,0.3),0 0 0 1px rgba(255,204,51,0.1); }
+    .banner-streak  { border-color: rgba(255,80,40,0.45);  box-shadow: 0 0 32px rgba(255,80,40,0.3), 0 0 0 1px rgba(255,80,40,0.1);  }
+    .banner-quest   { border-color: rgba(80,200,100,0.45); box-shadow: 0 0 32px rgba(80,200,100,0.3),0 0 0 1px rgba(80,200,100,0.1); }
+    .banner-main { font-size: 20px; font-weight: 900; color: #fff; font-family: 'Outfit', sans-serif; letter-spacing: 3px; text-transform: uppercase; }
+    .banner-sub  { font-size: 11px; color: rgba(255,255,255,0.45); font-family: 'Outfit', sans-serif; letter-spacing: 1px; }
 
     /* ── In-game kill feed (top-right) ── */
     #killfeed {
-      position: absolute; top: 48px; right: 10px; z-index: 15;
-      display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+      position: absolute; top: 60px; right: 10px; z-index: 15;
+      display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
       pointer-events: none; width: 240px;
     }
     .kf-entry {
-      font-size: 10px; font-weight: 600; padding: 4px 10px; border-radius: 6px;
-      background: rgba(0,0,0,0.65); border: 1px solid rgba(255,255,255,0.06);
-      backdrop-filter: blur(8px); white-space: nowrap;
-      color: #cc5555; border-left: 2px solid #cc4444;
+      font-size: 11px; font-weight: 600; font-family: 'Outfit', sans-serif;
+      padding: 6px 12px; border-radius: 8px;
+      background: rgba(4,4,10,0.7); border: 1px solid rgba(255,255,255,0.05);
+      backdrop-filter: blur(16px) saturate(120%); -webkit-backdrop-filter: blur(16px) saturate(120%); white-space: nowrap;
+      color: #ff6666; border-left: 3px solid #ff4444; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
     .kf-entry.level { color: #ddbb44; border-left-color: #ccaa22; }
     .kf-entry.quest { color: #66aa66; border-left-color: #559955; }
@@ -494,10 +503,10 @@
       <div id="panel-leaderboard" class="panel-view" style="display:none"><div id="leaderboard-list"></div></div>
       <div id="panel-log" class="panel-view" style="display:none"><div id="event-log"></div></div>
       <div id="panel-estate" class="panel-view" style="display:none">
-        <div style="padding:12px 16px;border-bottom:1px solid rgba(200,168,75,0.08)">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <span style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#7a6a40">Property Market</span>
-            <span id="estate-market-count" style="font-size:9px;color:#4a4a5a">Loading...</span>
+        <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.05);background:radial-gradient(ellipse at top right, rgba(200,168,75,0.08), transparent 60%)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <span style="font-size:12px;font-family:'Outfit',sans-serif;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#c8a84b;text-shadow:0 0 12px rgba(200,168,75,0.3)">Property Market</span>
+            <span id="estate-market-count" style="font-size:10px;color:#8a8a9a">Loading...</span>
           </div>
           <div style="display:flex;gap:16px;font-size:10px">
             <span>Total passive: <b id="estate-total-passive" style="color:#e8c860">0g/tick</b></span>
@@ -841,26 +850,26 @@
         portfolioEl.innerHTML = Object.entries(byOwner).map(([owner, ownedProps]) => {
           const income = ownedProps.reduce((s, p) => s + p.rentPerTick, 0);
           const items = ownedProps.map(p => `
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.03)">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
               <div>
-                <span style="font-size:10px;color:#c8c8d8">${p.name}</span>
-                <span style="font-size:9px;color:#${TIER_COLORS[p.tier] || '8a8a9a'};margin-left:6px">${TIER_NAMES[p.tier]}</span>
-                <div style="font-size:9px;color:#4a4a5a">${p.zone}</div>
+                <span style="font-size:11px;font-family:'Outfit',sans-serif;font-weight:600;color:#e8e0d4">${p.name}</span>
+                <span style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.05);color:#${TIER_COLORS[p.tier] || '8a8a9a'};margin-left:6px">${TIER_NAMES[p.tier]}</span>
+                <div style="font-size:9px;color:#5a5a6a;margin-top:2px">${p.zone}</div>
               </div>
               <div style="text-align:right">
-                <div style="font-size:10px;color:#e8c860">+${p.rentPerTick}g/tick</div>
-                ${p.listedFor ? `<div style="font-size:9px;color:#ff9800">Listed: ${p.listedFor}g</div>` : ''}
+                <div style="font-size:11px;font-weight:700;color:#c8a84b;font-family:'Outfit',sans-serif">+${p.rentPerTick}g/tick</div>
+                ${p.listedFor ? `<div style="font-size:9px;color:#ff5555">Listed: ${p.listedFor}g</div>` : ''}
               </div>
             </div>`).join('');
           return `
-            <div style="padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);background:rgba(18,18,28,0.8)">
+            <div style="padding:16px;border-radius:16px;border:1px solid rgba(255,255,255,0.05);background:linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));box-shadow: 0 4px 20px rgba(0,0,0,0.2)">
               <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-                <span style="font-size:10px;font-weight:700;color:#d8cfc0">${owner}</span>
-                <span style="font-size:10px;color:#e8c860;font-weight:700">+${income}g/tick</span>
+                <span style="font-size:12px;font-weight:700;color:#d8cfc0;font-family:'Outfit',sans-serif">${owner}</span>
+                <span style="font-size:11px;color:#e8c860;font-weight:700;font-family:'Outfit',sans-serif">+${income}g/tick</span>
               </div>
               ${items}
             </div>`;
-        }).join('') || '<div style="padding:12px;font-size:10px;color:#3a3a4a">No properties owned yet — agents are saving up gold</div>';
+        }).join('') || '<div style="padding:12px;font-size:10px;color:#5a5a6a">No properties owned yet — agents are saving up gold</div>';
 
         // Market listings
         const listingsEl = document.getElementById('estate-listings-list');

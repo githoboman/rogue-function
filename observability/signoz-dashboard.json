@@ -1,0 +1,185 @@
+{
+  "title": "World of Guilds — Leaderless Agent Economy",
+  "description": "Live observability for a leaderless multi-agent economy coordinated over FoxMQ, settled on Stacks. Built for Agents of SigNoz (Track 1). Import: Dashboards → + New → Import JSON.",
+  "tags": ["wog", "agents", "foxmq", "hackathon", "track-1"],
+  "layout": [
+    { "i": "hp", "x": 0, "y": 0, "w": 6, "h": 3 },
+    { "i": "gold", "x": 6, "y": 0, "w": 6, "h": 3 },
+    { "i": "consensus_wins", "x": 0, "y": 3, "w": 6, "h": 3 },
+    { "i": "consensus_conflicts", "x": 6, "y": 3, "w": 6, "h": 3 },
+    { "i": "mesh_published", "x": 0, "y": 6, "w": 6, "h": 3 },
+    { "i": "mesh_received", "x": 6, "y": 6, "w": 6, "h": 3 },
+    { "i": "tx_rate", "x": 0, "y": 9, "w": 6, "h": 3 },
+    { "i": "tx_latency", "x": 6, "y": 9, "w": 6, "h": 3 }
+  ],
+  "widgets": [
+    {
+      "id": "hp",
+      "title": "Agent HP",
+      "description": "Per-agent hit points over time. Flat-lines / sharp drops = an agent in trouble.",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "aggregateOperator": "latest",
+              "aggregateAttribute": { "key": "wog.agent.hp", "type": "Gauge" },
+              "groupBy": [{ "key": "agent", "type": "tag" }],
+              "expression": "A",
+              "legend": "{{agent}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gold",
+      "title": "Agent Gold",
+      "description": "Per-agent gold. The economy in one line — who is accumulating vs. bleeding.",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "aggregateOperator": "latest",
+              "aggregateAttribute": { "key": "wog.agent.gold", "type": "Gauge" },
+              "groupBy": [{ "key": "agent", "type": "tag" }],
+              "expression": "A",
+              "legend": "{{agent}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "consensus_wins",
+      "title": "Consensus Claims Won (rate)",
+      "description": "Zone/quest/property claims won via FoxMQ order. This is BFT ordering, observed.",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "aggregateOperator": "rate",
+              "aggregateAttribute": { "key": "wog.consensus.wins", "type": "Sum" },
+              "groupBy": [{ "key": "kind", "type": "tag" }],
+              "expression": "A",
+              "legend": "{{kind}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "consensus_conflicts",
+      "title": "Consensus Conflicts Resolved (rate)",
+      "description": "Simultaneous claims where an earlier consensus-ordered peer won. Deterministic conflict resolution with no coordinator.",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "aggregateOperator": "rate",
+              "aggregateAttribute": { "key": "wog.consensus.conflicts", "type": "Sum" },
+              "groupBy": [{ "key": "winner", "type": "tag" }],
+              "expression": "A",
+              "legend": "won by {{winner}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "mesh_published",
+      "title": "FoxMQ Messages Published (by topic)",
+      "description": "Producer throughput per wog/* topic.",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "aggregateOperator": "rate",
+              "aggregateAttribute": { "key": "wog.mesh.messages_published", "type": "Sum" },
+              "groupBy": [{ "key": "topic", "type": "tag" }],
+              "expression": "A",
+              "legend": "{{topic}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "mesh_received",
+      "title": "FoxMQ Messages Received by Shard (by topic)",
+      "description": "Consumer throughput at the shard bridge per topic.",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "aggregateOperator": "rate",
+              "aggregateAttribute": { "key": "wog.mesh.messages_received", "type": "Sum" },
+              "groupBy": [{ "key": "topic", "type": "tag" }],
+              "expression": "A",
+              "legend": "{{topic}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tx_rate",
+      "title": "Stacks Transactions (rate, by result)",
+      "description": "On-chain settlement throughput. Errors here = failed blockchain writes.",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "aggregateOperator": "rate",
+              "aggregateAttribute": { "key": "wog.blockchain.tx", "type": "Sum" },
+              "groupBy": [{ "key": "result", "type": "tag" }],
+              "expression": "A",
+              "legend": "{{result}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tx_latency",
+      "title": "Stacks Transaction Latency (p95)",
+      "description": "95th-percentile latency of on-chain settlement, in ms.",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "aggregateOperator": "p95",
+              "aggregateAttribute": { "key": "wog.blockchain.tx_latency_ms", "type": "Histogram" },
+              "groupBy": [{ "key": "function", "type": "tag" }],
+              "expression": "A",
+              "legend": "{{function}}"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
