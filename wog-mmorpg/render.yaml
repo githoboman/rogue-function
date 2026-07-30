@@ -33,6 +33,13 @@ services:
         sync: false
       - key: OTEL_SERVICE_NAME
         value: wog-shard
+      # ── LLM provider: NVIDIA NIM (OpenAI-compatible, free tier) ──
+      - key: LLM_BASE_URL
+        value: https://integrate.api.nvidia.com/v1
+      - key: LLM_API_KEY
+        sync: false            # your nvapi-... key — set in dashboard
+      - key: AGENT_MODEL
+        value: meta/llama-3.3-70b-instruct
       # ── Secrets — set these in the Render dashboard, never commit ──
       - key: ANTHROPIC_API_KEY
         sync: false

@@ -7,7 +7,7 @@
     "agents": "node --env-file=.env node_modules/tsx/dist/cli.mjs src/batchAgents.ts",
     "mint": "node --env-file=.env node_modules/tsx/dist/cli.mjs src/spawnCharacterNFT.ts",
     "setup-wallets": "node --env-file=.env node_modules/tsx/dist/cli.mjs src/agentWallets.ts",
-    "start": "node --env-file=.env node_modules/tsx/dist/cli.mjs src/server.ts",
+    "start": "node --env-file-if-exists=.env node_modules/tsx/dist/cli.mjs src/server.ts",
     "sprint:create": "node --env-file=.env node_modules/tsx/dist/cli.mjs src/createSprint.ts",
     "test": "vitest run",
     "test:watch": "vitest"
