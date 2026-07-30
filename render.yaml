@@ -1,0 +1,54 @@
+# render.yaml — Render Blueprint (MUST be at repo root for Render to find it).
+# Deploy: Render Dashboard → New → Blueprint → select this repo.
+# Set the secret env vars (marked sync:false) in the dashboard after first deploy.
+
+services:
+  - type: web
+    name: wog-shard
+    runtime: node
+    plan: free                      # free tier sleeps on inactivity; fine for demo
+    rootDir: wog-mmorpg/shard       # build/run inside the shard subfolder
+    buildCommand: npm install
+    startCommand: npm start         # node --env-file-if-exists=.env tsx src/server.ts
+    healthCheckPath: /health
+    autoDeploy: true
+    # NOTE: persistent disks are a PAID feature on Render. On the free plan,
+    # leave the disk out (game-state.json just resets on redeploy — fine for a
+    # demo). To enable persistence on a paid plan, uncomment the disk block and
+    # set SAVE_FILE=/data/game-state.json.
+    # disk:
+    #   name: wog-state
+    #   mountPath: /data
+    #   sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: STACKS_NETWORK
+        value: testnet
+      # ── Observability → SigNoz (set values in dashboard) ──────
+      - key: OTEL_EXPORTER_OTLP_ENDPOINT
+        sync: false
+      - key: SIGNOZ_INGESTION_KEY
+        sync: false
+      - key: OTEL_SERVICE_NAME
+        value: wog-shard
+      # ── LLM provider: NVIDIA NIM (OpenAI-compatible, free tier) ──
+      - key: LLM_BASE_URL
+        value: https://integrate.api.nvidia.com/v1
+      - key: LLM_API_KEY
+        sync: false            # your nvapi-... key — set in dashboard
+      - key: AGENT_MODEL
+        value: meta/llama-3.3-70b-instruct
+      # ── Secrets — set in the Render dashboard, never commit ──
+      - key: AGENT_SEED_PHRASE
+        sync: false
+      - key: SERVER_PRIVATE_KEY
+        sync: false
+      - key: SERVER_STACKS_ADDRESS
+        sync: false
+      - key: GOLD_CONTRACT_ADDRESS
+        sync: false
+      - key: CHARACTER_CONTRACT_ADDRESS
+        sync: false
+      - key: ITEMS_CONTRACT_ADDRESS
+        sync: false
