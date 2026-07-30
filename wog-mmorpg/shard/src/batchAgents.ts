@@ -773,7 +773,11 @@ async function main(): Promise<void> {
   const agentCount = Math.min(parseInt(process.env.AGENT_COUNT || "1"), 5);
   const serverPrivateKey = process.env.SERVER_PRIVATE_KEY;
 
-  if (!process.env.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not set");
+  // Need SOME LLM provider: either an OpenAI-compatible endpoint (NVIDIA,
+  // OpenRouter, …) via LLM_API_KEY, or the Anthropic API directly.
+  if (!process.env.LLM_API_KEY && !process.env.ANTHROPIC_API_KEY) {
+    throw new Error("No LLM provider set — set LLM_API_KEY (OpenAI-compatible) or ANTHROPIC_API_KEY");
+  }
   if (!serverPrivateKey) throw new Error("SERVER_PRIVATE_KEY not set");
 
   console.log(`
